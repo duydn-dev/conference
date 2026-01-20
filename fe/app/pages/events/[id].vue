@@ -195,6 +195,87 @@
               class="w-full"
             />
           </div>
+
+          <!-- Tài liệu đính kèm -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Tài liệu đính kèm
+            </label>
+            
+            <!-- Existing documents -->
+            <div v-if="existingDocuments.length > 0" class="mb-3 space-y-2">
+              <div 
+                v-for="doc in existingDocuments" 
+                :key="doc.id"
+                class="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
+              >
+                <div class="flex items-center gap-3">
+                  <i class="pi pi-file text-2xl text-gray-400"></i>
+                  <div>
+                    <p class="font-medium text-sm">{{ doc.file_name }}</p>
+                    <p class="text-xs text-gray-500">{{ doc.file_type?.toUpperCase() }}</p>
+                  </div>
+                </div>
+                <Button 
+                  icon="pi pi-trash" 
+                  severity="danger" 
+                  text 
+                  rounded
+                  @click="removeExistingDocument(doc.id)"
+                />
+              </div>
+            </div>
+
+            <!-- New documents upload -->
+            <VFileUpload 
+              v-model="newDocuments" 
+              :isMultiple="true" 
+              accept="image/*,application/pdf"
+              :maxFileSize="10000000"
+            />
+          </div>
+
+          <!-- Danh sách khách mời -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Danh sách khách mời
+            </label>
+            <div class="space-y-3">
+              <div class="flex justify-end gap-2">
+                <Button 
+                  label="Thêm khách mời" 
+                  icon="pi pi-plus" 
+                  @click="showParticipantDialog = true"
+                  size="small"
+                />
+              </div>
+              
+              <DataTable 
+                :value="selectedParticipants" 
+                :rows="10"
+                :paginator="selectedParticipants.length > 10"
+                class="border border-gray-200 rounded-lg"
+                :emptyMessage="'Chưa có khách mời'"
+              >
+                <Column field="full_name" header="Họ tên" />
+                <Column field="identity_number" header="CMND/CCCD" />
+                <Column field="email" header="Email" />
+                <Column field="phone" header="Số điện thoại" />
+                <Column field="organization" header="Tổ chức" />
+                <Column header="Thao tác" style="width: 100px">
+                  <template #body="{ data }">
+                    <Button 
+                      icon="pi pi-trash" 
+                      severity="danger" 
+                      text 
+                      rounded
+                      @click="removeParticipant(data.id)"
+                    />
+                  </template>
+                </Column>
+              </DataTable>
+            </div>
+          </div>
         </div>
 
         <!-- Actions -->
@@ -216,6 +297,13 @@
       </form>
     </div>
 
+    <!-- Participant Dialog (componentized) -->
+    <ParticipantManagerDialog
+      v-model:modelValue="showParticipantDialog"
+      v-model:participants="selectedParticipants"
+      :event-id="route.params.id as string"
+    />
+
     <!-- Map Modal -->
     <MapPickerModal 
       v-model:visible="showMapModal"
@@ -230,8 +318,15 @@
 import { ref, onMounted } from 'vue'
 import { useEvents } from '~/composables/useEvents'
 import { useOrganizerUnits } from '~/composables/useOrganizerUnits'
+import { useEventDocuments } from '~/composables/useEventDocuments'
+import { useEventParticipants } from '~/composables/useEventParticipants'
+import { useParticipants } from '~/composables/useParticipants'
 import { useToastSafe } from '~/composables/useToastSafe'
 import { useRoute } from 'vue-router'
+import { EventStatus, EventStatusLabels } from '~/types/event'
+import { ParticipantStatus, ImportSource } from '~/types/event-participant'
+import type { Participant } from '~/types/participant'
+import type { EventDocument } from '~/types/event-document'
 
 useHead({
   title: 'Chỉnh sửa sự kiện'
@@ -240,13 +335,25 @@ useHead({
 const route = useRoute()
 const toast = useToastSafe()
 const { getById, update } = useEvents()
-const { getPagination } = useOrganizerUnits()
+const { getPagination: getOrganizerUnits } = useOrganizerUnits()
+const { getPagination: getDocuments, create: createDocument, remove: removeDocument } = useEventDocuments()
+const { getPagination: getEventParticipants, create: createEventParticipant, remove: removeEventParticipant } = useEventParticipants()
+const { getPagination: getParticipants, create: createParticipant } = useParticipants()
 
 const loading = ref(true)
 const submitting = ref(false)
 const loadingOrganizerUnits = ref(false)
 const organizerUnits = ref([])
 const errors = ref<Record<string, string>>({})
+
+// Documents state
+const existingDocuments = ref<EventDocument[]>([])
+const newDocuments = ref<string[] | null>(null)
+const documentsToDelete = ref<string[]>([])
+
+// Participants state (dùng cho component ParticipantManagerDialog)
+const showParticipantDialog = ref(false)
+const selectedParticipants = ref<any[]>([]) // Will include both Participant data and relation id
 
 // Map modal state
 const showMapModal = ref(false)
@@ -264,14 +371,14 @@ const formData = ref({
   organizer_unit_id: null as string | null,
   representative_name: '',
   representative_identity: '',
-  status: 'draft' as 'draft' | 'published' | 'closed' | 'cancelled'
+  status: EventStatus.DRAFT
 })
 
 const statusOptions = [
-  { label: 'Bản nháp', value: 'draft' },
-  { label: 'Đã xuất bản', value: 'published' },
-  { label: 'Đã đóng', value: 'closed' },
-  { label: 'Đã hủy', value: 'cancelled' }
+  { label: EventStatusLabels[EventStatus.DRAFT], value: EventStatus.DRAFT },
+  { label: EventStatusLabels[EventStatus.PUBLISHED], value: EventStatus.PUBLISHED },
+  { label: EventStatusLabels[EventStatus.CLOSED], value: EventStatus.CLOSED },
+  { label: EventStatusLabels[EventStatus.CANCELLED], value: EventStatus.CANCELLED }
 ]
 
 const loadEvent = async () => {
@@ -309,16 +416,59 @@ const loadEvent = async () => {
 const loadOrganizerUnits = async () => {
   try {
     loadingOrganizerUnits.value = true
-    const response = await getPagination({ page: 1, limit: 100 })
+    const response = await getOrganizerUnits({ page: 1, limit: 100 })
+    
+    console.log('Organizer units response:', response)
+    
+    if (response.error.value) {
+      console.error('Error loading organizer units:', response.error.value)
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
+      organizerUnits.value = []
+      return
+    }
+    
     const result = (response.data.value as any)
-    if (result) {
-      organizerUnits.value = result.data || []
+    console.log('Organizer units result:', result)
+    
+    if (result && result.data) {
+      organizerUnits.value = Array.isArray(result.data) ? result.data : []
+      console.log('Loaded organizer units:', organizerUnits.value.length)
+    } else {
+      console.warn('No data in response, setting empty array')
+      organizerUnits.value = []
     }
   } catch (error) {
     console.error('Error loading organizer units:', error)
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
+    organizerUnits.value = []
   } finally {
     loadingOrganizerUnits.value = false
   }
+}
+
+const loadDocuments = async () => {
+  try {
+    const eventId = route.params.id as string
+    const response = await getDocuments({ event_id: eventId, limit: 100 })
+    const result = (response.data.value as any)
+    if (result) {
+      existingDocuments.value = result.data || []
+    }
+  } catch (error) {
+    console.error('Error loading documents:', error)
+  }
+}
+
+const removeParticipant = (participantId: string) => {
+  const index = selectedParticipants.value.findIndex(p => p.id === participantId)
+  if (index !== -1) {
+    selectedParticipants.value.splice(index, 1)
+  }
+}
+
+const removeExistingDocument = (docId: string) => {
+  documentsToDelete.value.push(docId)
+  existingDocuments.value = existingDocuments.value.filter(d => d.id !== docId)
 }
 
 const validate = () => {
@@ -392,6 +542,10 @@ const handleLocationSelected = (location: { address: string; lat: number; lng: n
 }
 
 onMounted(async () => {
-  await Promise.all([loadEvent(), loadOrganizerUnits()])
+  await Promise.all([
+    loadEvent(), 
+    loadOrganizerUnits(), 
+    loadDocuments()
+  ])
 })
 </script>

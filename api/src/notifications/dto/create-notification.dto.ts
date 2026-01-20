@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsUUID, IsEnum } from 'class-validator';
-import { NotificationType } from '../../events/entities/notification.entity';
+import { NotificationType } from '../entities/notification.entity';
 
 export class CreateNotificationDto {
   @IsOptional()

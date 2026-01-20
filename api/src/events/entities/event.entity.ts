@@ -8,13 +8,13 @@ import {
   OneToMany,
   JoinColumn,
 } from 'typeorm';
-import { OrganizerUnit } from './organizer-unit.entity';
-import { EventContent } from './event-content.entity';
-import { EventDocument } from './event-document.entity';
-import { EventParticipant } from './event-participant.entity';
-import { Notification } from './notification.entity';
-import { Minigame } from './minigame.entity';
-import { ImportLog } from './import-log.entity';
+import { OrganizerUnit } from '../../organizer-units/entities/organizer-unit.entity';
+import { EventDocument } from '../../event-documents/entities/event-document.entity';
+import { EventParticipant } from '../../event-participants/entities/event-participant.entity';
+import { Notification } from '../../notifications/entities/notification.entity';
+import { Minigame } from '../../minigames/entities/minigame.entity';
+import { ImportLog } from '../../import-logs/entities/import-log.entity';
+import { EventJob } from '../../event-jobs/entities/event-job.entity';
 
 export enum EventStatus {
   DRAFT = 0,         // Bản nháp
@@ -70,9 +70,6 @@ export class Event {
   @Column({ type: 'varchar', nullable: true })
   avatar?: string | null;
 
-  @OneToMany(() => EventContent, (content) => content.event)
-  contents: EventContent[];
-
   @OneToMany(() => EventDocument, (document) => document.event)
   documents: EventDocument[];
 
@@ -87,6 +84,9 @@ export class Event {
 
   @OneToMany(() => ImportLog, (importLog) => importLog.event)
   importLogs: ImportLog[];
+
+  @OneToMany(() => EventJob, (job) => job.event)
+  jobs: EventJob[];
 
   @CreateDateColumn()
   created_at: Date;

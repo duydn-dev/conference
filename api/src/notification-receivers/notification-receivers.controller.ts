@@ -33,6 +33,11 @@ export class NotificationReceiversController {
     return this.notificationReceiversService.update(id, updateNotificationReceiverDto);
   }
 
+  @Patch('mark-read-by-notification/:notificationId')
+  markAllAsReadByNotification(@Param('notificationId') notificationId: string) {
+    return this.notificationReceiversService.markAllAsReadByNotification(notificationId);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.notificationReceiversService.remove(id);

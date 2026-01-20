@@ -1,6 +1,7 @@
 <template>
   <div class="card">
     <PrimeFileUpload 
+      ref="fileUploadRef"
       name="files[]" 
       :url="uploadUrl" 
       @upload="onTemplatedUpload($event)" 
@@ -17,7 +18,7 @@
           <div class="flex gap-2">
             <Button 
               @click="chooseCallback()" 
-              icon="pi pi-images" 
+              :icon="uploadButtonIcon" 
               rounded 
               outlined
               severity="secondary"
@@ -63,7 +64,7 @@
               >
                 <div>
                   <img 
-                    v-if="(file as any).objectURL" 
+                    v-if="(file as any).objectURL && isImageFile(file)" 
                     role="presentation" 
                     :alt="file.name" 
                     :src="(file as any).objectURL" 
@@ -98,10 +99,10 @@
               >
                 <div>
                   <img 
-                    v-if="file.url" 
+                    v-if="file.url && (file.type?.startsWith('image/') || isImageFileByName(file.name || file.url))" 
                     role="presentation" 
                     :alt="file.name" 
-                    :src="file.url" 
+                    :src="getFullUrl(file.url)" 
                     class="w-24 h-24 object-cover rounded"
                   />
                   <i v-else class="pi pi-file text-4xl text-gray-400"></i>
@@ -126,7 +127,7 @@
       </template>
       
       <template #empty>
-        <div class="flex items-center justify-center flex-col py-12">
+        <div class="flex items-center justify-center flex-col">
           <i class="pi pi-cloud-upload border-2 rounded-full p-8 text-6xl text-gray-400" />
           <p class="mt-6 mb-0 text-gray-500">Kéo thả file vào đây để upload</p>
         </div>
@@ -154,7 +155,7 @@ const props = withDefaults(defineProps<Props>(), {
   isMultiple: false,
   accept: 'image/*',
   maxFileSize: 5000000, // 5MB
-  uploadUrl: '/api/events/upload',
+  uploadUrl: '/api/events/upload', // Gọi Nitro server (same origin)
   autoUpload: true
 })
 
@@ -163,13 +164,27 @@ const emit = defineEmits<{
 }>()
 
 const toast = useToastSafe()
+const fileUploadRef = ref<any>(null)
 const totalSize = ref(0)
 const totalSizePercent = ref(0)
 const uploading = ref(false)
-const uploadedFilesList = ref<Array<{ url: string; name: string; size: number }>>([])
+const uploadedFilesList = ref<Array<{ url: string; name: string; size: number; type?: string }>>([])
+
+// Sử dụng composable để xử lý file URL
+const { getFullUrl } = useFileUrl()
 
 const maxFileSizeMB = computed(() => {
   return (props.maxFileSize / 1000000).toFixed(0)
+})
+
+// Icon nút chọn file: nếu accept là ảnh thì dùng icon ảnh, ngược lại dùng icon file
+const uploadButtonIcon = computed(() => {
+  const accept = props.accept?.toLowerCase() || ''
+  // if (accept.includes('image')) {
+  if (accept === 'image/*') {
+    return 'pi pi-images'
+  }
+  return 'pi pi-file'
 })
 
 const onRemoveTemplatingFile = (file: any, removeFileCallback: Function, index: number) => {
@@ -209,35 +224,38 @@ const uploadFiles = async (files: File[]) => {
       }
     }
     
-    // Upload to server
-    const response = await $fetch(props.uploadUrl, {
+    // Upload to Nitro server (will forward to NestJS)
+    const uploadEndpoint = props.isMultiple ? '/api/events/upload-multiple' : props.uploadUrl
+    const response = await $fetch(uploadEndpoint, {
       method: 'POST',
       body: formData
     })
     
     // Parse response - API trả về { path: string } hoặc { paths: string[] }
-    // Path không có host, ví dụ: /fileupload/abc.jpg
+    // Path không có host, ví dụ: /uploads/abc.jpg
     const uploadedData = response as any
     
     if (props.isMultiple) {
       // API trả về array paths
       const paths = uploadedData.paths || uploadedData.urls || []
       uploadedFilesList.value = paths.map((path: string, index: number) => ({
-        url: path, // Đường dẫn không có host
+        url: path, // Lưu relative path
         name: files[index]?.name || 'file',
-        size: files[index]?.size || 0
+        size: files[index]?.size || 0,
+        type: files[index]?.type || ''
       }))
-      emit('update:modelValue', paths)
+      emit('update:modelValue', paths) // Emit relative paths
     } else {
       // API trả về single path
       const path = uploadedData.path || uploadedData.url || ''
       const firstFile = files[0]
       uploadedFilesList.value = [{
-        url: path, // Đường dẫn không có host
+        url: path, // Lưu relative path
         name: firstFile?.name || 'file',
-        size: firstFile?.size || 0
+        size: firstFile?.size || 0,
+        type: firstFile?.type || ''
       }]
-      emit('update:modelValue', path)
+      emit('update:modelValue', path) // Emit relative path
     }
     
     toast.add({ 
@@ -246,6 +264,11 @@ const uploadFiles = async (files: File[]) => {
       detail: 'Upload file thành công', 
       life: 3000 
     })
+    
+    // Clear files from PrimeFileUpload component
+    if (fileUploadRef.value) {
+      fileUploadRef.value.clear()
+    }
     
     // Reset size tracking
     totalSize.value = 0
@@ -298,6 +321,21 @@ const formatSize = (bytes: number): string => {
   const formattedSize = parseFloat((bytes / Math.pow(k, i)).toFixed(dm))
 
   return `${formattedSize} ${sizes[i]}`
+}
+
+// Kiểm tra xem file có phải là ảnh không dựa trên MIME type
+const isImageFile = (file: File): boolean => {
+  return file.type.startsWith('image/')
+}
+
+// Kiểm tra xem file có phải là ảnh không dựa trên tên file hoặc URL
+const isImageFileByName = (fileNameOrUrl: string): boolean => {
+  if (!fileNameOrUrl) return false
+  
+  const imageExtensions = ['.jpg', '.jpeg', '.png', '.gif', '.bmp', '.webp', '.svg', '.ico']
+  const lowerName = fileNameOrUrl.toLowerCase()
+  
+  return imageExtensions.some(ext => lowerName.endsWith(ext))
 }
 </script>
 

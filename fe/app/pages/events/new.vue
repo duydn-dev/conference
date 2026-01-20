@@ -145,6 +145,60 @@
             </label>
             <InputText v-model="formData.representative_identity" placeholder="Nhập số CMND/CCCD" class="w-full" />
           </div>
+
+          <!-- Tài liệu đính kèm -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Tài liệu đính kèm
+            </label>
+            <VFileUpload 
+              v-model="documents" 
+              :isMultiple="true" 
+              accept="image/*,application/pdf"
+              :maxFileSize="10000000"
+            />
+          </div>
+
+          <!-- Danh sách khách mời -->
+          <div class="md:col-span-2">
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Danh sách khách mời
+            </label>
+            <div class="space-y-3">
+              <div class="flex justify-end gap-2">
+                <Button 
+                  label="Thêm khách mời" 
+                  icon="pi pi-plus" 
+                  @click="showParticipantDialog = true"
+                  size="small"
+                />
+              </div>
+              
+              <DataTable 
+                :value="selectedParticipants" 
+                :rows="10"
+                class="border border-gray-200 rounded-lg"
+                :emptyMessage="'Chưa có khách mời'"
+              >
+                <Column field="full_name" header="Họ tên" />
+                <Column field="identity_number" header="CMND/CCCD" />
+                <Column field="email" header="Email" />
+                <Column field="phone" header="Số điện thoại" />
+                <Column field="organization" header="Tổ chức" />
+                <Column header="Thao tác" style="width: 100px">
+                  <template #body="{ index }">
+                    <Button 
+                      icon="pi pi-trash" 
+                      severity="danger" 
+                      text 
+                      rounded
+                      @click="removeParticipant(index)"
+                    />
+                  </template>
+                </Column>
+              </DataTable>
+            </div>
+          </div>
         </div>
 
         <!-- Actions -->
@@ -155,6 +209,12 @@
         </div>
       </form>
     </div>
+
+    <!-- Participant Dialog (componentized) -->
+    <ParticipantManagerDialog
+      v-model:modelValue="showParticipantDialog"
+      v-model:participants="selectedParticipants"
+    />
 
     <!-- Map Modal -->
     <MapPickerModal 
@@ -170,7 +230,12 @@
 import { ref, onMounted } from 'vue'
 import { useEvents } from '~/composables/useEvents'
 import { useOrganizerUnits } from '~/composables/useOrganizerUnits'
+import { useEventDocuments } from '~/composables/useEventDocuments'
+import { useEventParticipants } from '~/composables/useEventParticipants'
 import { useToastSafe } from '~/composables/useToastSafe'
+import { EventStatus, EventStatusLabels } from '~/types/event'
+import { ParticipantStatus, ImportSource } from '~/types/event-participant'
+import type { Participant } from '~/types/participant'
 
 useHead({
   title: 'Thêm mới sự kiện'
@@ -178,12 +243,21 @@ useHead({
 
 const toast = useToastSafe()
 const { create } = useEvents()
-const { getPagination } = useOrganizerUnits()
+const { getPagination: getOrganizerUnits } = useOrganizerUnits()
+const { create: createDocument } = useEventDocuments()
+const { create: createEventParticipant } = useEventParticipants()
 
 const submitting = ref(false)
 const loadingOrganizerUnits = ref(false)
 const organizerUnits = ref([])
 const errors = ref<Record<string, string>>({})
+
+// Documents state
+const documents = ref<string[] | null>(null)
+
+// Participants state (dùng cho component ParticipantManagerDialog)
+const showParticipantDialog = ref(false)
+const selectedParticipants = ref<Participant[]>([])
 
 // Map modal state
 const showMapModal = ref(false)
@@ -203,29 +277,51 @@ const formData = ref({
   organizer_unit_id: null as string | null,
   representative_name: '',
   representative_identity: '',
-  status: 'draft' as 'draft' | 'published' | 'closed' | 'cancelled'
+  status: EventStatus.DRAFT
 })
 
 const statusOptions = [
-  { label: 'Bản nháp', value: 'draft' },
-  { label: 'Đã xuất bản', value: 'published' },
-  { label: 'Đã đóng', value: 'closed' },
-  { label: 'Đã hủy', value: 'cancelled' }
+  { label: EventStatusLabels[EventStatus.DRAFT], value: EventStatus.DRAFT },
+  { label: EventStatusLabels[EventStatus.PUBLISHED], value: EventStatus.PUBLISHED },
+  { label: EventStatusLabels[EventStatus.CLOSED], value: EventStatus.CLOSED },
+  { label: EventStatusLabels[EventStatus.CANCELLED], value: EventStatus.CANCELLED }
 ]
 
 const loadOrganizerUnits = async () => {
   try {
     loadingOrganizerUnits.value = true
-    const response = await getPagination({ page: 1, limit: 100 })
+    const response = await getOrganizerUnits({ page: 1, limit: 100 })
+    
+    console.log('Organizer units response:', response)
+    
+    if (response.error.value) {
+      console.error('Error loading organizer units:', response.error.value)
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
+      organizerUnits.value = []
+      return
+    }
+    
     const result = (response.data.value as any)
-    if (result) {
-      organizerUnits.value = result.data || []
+    console.log('Organizer units result:', result)
+    
+    if (result && result.data) {
+      organizerUnits.value = Array.isArray(result.data) ? result.data : []
+      console.log('Loaded organizer units:', organizerUnits.value.length)
+    } else {
+      console.warn('No data in response, setting empty array')
+      organizerUnits.value = []
     }
   } catch (error) {
     console.error('Error loading organizer units:', error)
+    toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
+    organizerUnits.value = []
   } finally {
     loadingOrganizerUnits.value = false
   }
+}
+
+const removeParticipant = (index: number) => {
+  selectedParticipants.value.splice(index, 1)
 }
 
 const validate = () => {
@@ -271,7 +367,51 @@ const handleSubmit = async () => {
       organizer_unit_id: rest.organizer_unit_id || undefined
     }
 
-    await create(data)
+    // Step 1: Create event
+    const response = await create(data)
+    const createdEvent = (response.data.value as any)
+    
+    if (!createdEvent?.id) {
+      throw new Error('Failed to create event')
+    }
+
+    const eventId = createdEvent.id
+
+    // Step 2: Create documents if any
+    if (documents.value && documents.value.length > 0) {
+      for (const filePath of documents.value) {
+        try {
+          const fileName = filePath.split('/').pop() || 'unknown'
+          await createDocument({
+            event_id: eventId,
+            file_name: fileName,
+            file_path: filePath,
+            file_type: fileName.split('.').pop() || 'unknown'
+          })
+        } catch (docError) {
+          console.error('Error creating document:', docError)
+          // Continue with other documents
+        }
+      }
+    }
+
+    // Step 3: Create event participants if any
+    if (selectedParticipants.value.length > 0) {
+      for (const participant of selectedParticipants.value) {
+        try {
+          await createEventParticipant({
+            event_id: eventId,
+            participant_id: participant.id,
+            status: ParticipantStatus.REGISTERED,
+            source: ImportSource.MANUAL
+          })
+        } catch (partError) {
+          console.error('Error creating event participant:', partError)
+          // Continue with other participants
+        }
+      }
+    }
+
     toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã tạo sự kiện thành công', life: 3000 })
     navigateTo('/events')
   } catch (error: any) {

@@ -1,10 +1,15 @@
+import type { EventParticipant, CreateEventParticipantDto, UpdateEventParticipantDto } from '~/types/event-participant'
+
 export const useEventParticipants = () => {
+  const config = useRuntimeConfig()
+  const baseURL = config.public.apiBase || 'http://localhost:3001'
+
   const getPagination = async (options?: {
     page?: number
     limit?: number
     event_id?: string
     participant_id?: string
-    status?: 'registered' | 'checked_in' | 'absent'
+    status?: number // ParticipantStatus enum value
     relations?: boolean
   }) => {
     const query: any = {}
@@ -12,48 +17,37 @@ export const useEventParticipants = () => {
     if (options?.limit) query.limit = options.limit
     if (options?.event_id) query.event_id = options.event_id
     if (options?.participant_id) query.participant_id = options.participant_id
-    if (options?.status) query.status = options.status
+    if (options?.status !== undefined) query.status = options.status
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/api/event-participants', { query })
+    return await useFetch('/event-participants', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/api/event-participants/${id}`, { query })
+    return await useFetch(`/event-participants/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    event_id: string
-    participant_id: string
-    checkin_time?: string | Date
-    checkout_time?: string | Date
-    status?: 'registered' | 'checked_in' | 'absent'
-    source?: 'manual' | 'excel_import' | 'api'
-  }) => {
-    return await useFetch('/api/event-participants', {
+  const create = async (data: CreateEventParticipantDto) => {
+    return await useFetch('/event-participants', {
       method: 'POST',
-      body: data
+      body: data,
+      baseURL
     })
   }
 
-  const update = async (
-    id: string,
-    data: {
-      checkin_time?: string | Date
-      checkout_time?: string | Date
-      status?: 'registered' | 'checked_in' | 'absent'
-    }
-  ) => {
-    return await useFetch(`/api/event-participants/${id}`, {
+  const update = async (id: string, data: Partial<UpdateEventParticipantDto>) => {
+    return await useFetch(`/event-participants/${id}`, {
       method: 'PUT',
-      body: data
+      body: data,
+      baseURL
     })
   }
 
   const remove = async (id: string) => {
-    return await useFetch(`/api/event-participants/${id}`, {
-      method: 'DELETE'
+    return await useFetch(`/event-participants/${id}`, {
+      method: 'DELETE',
+      baseURL
     })
   }
 

@@ -6,6 +6,8 @@ Database schema cho hệ thống quản lý sự kiện (Event Management System
 
 > 📌 **Database-First Approach**: Schema được quản lý trực tiếp trong PostgreSQL. Entities được định nghĩa để map với database schema có sẵn. Xem [DATABASE-FIRST.md](./DATABASE-FIRST.md) để biết thêm chi tiết.
 
+> 🔄 **Migrations**: Để quản lý và sync database schema, xem [MIGRATIONS.md](./MIGRATIONS.md) để biết cách sử dụng hệ thống migration.
+
 ## Cấu trúc Entities
 
 ### 1. OrganizerUnit (Đơn vị tổ chức)

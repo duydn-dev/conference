@@ -20,6 +20,11 @@ interface Props {
   width?: string
   height?: string
   mapId?: string
+  initialLocation?: {
+    address: string
+    lat: number
+    lng: number
+  } | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -29,7 +34,8 @@ const props = withDefaults(defineProps<Props>(), {
   style: 'vtmapgl.STYLES.VTRANS',
   width: '100%',
   height: '400px',
-  mapId: 'vtmap'
+  mapId: 'vtmap',
+  initialLocation: null
 })
 
 const map = ref<any>(null)
@@ -244,6 +250,8 @@ const setupMapLoadHandler = () => {
   map.value.on('load', () => {
     mapLoaded.value = true
     emit('map-loaded', map.value)
+    // Áp dụng vị trí khởi tạo nếu có
+    applyInitialLocation()
   })
 }
 
@@ -276,11 +284,26 @@ const initMap = () => {
   }
 }
 
+// Áp dụng vị trí khởi tạo (nếu truyền vào)
+const applyInitialLocation = () => {
+  if (!props.initialLocation || !map.value) return
+  const { lat, lng, address } = props.initialLocation
+  const marker = createLocationMarker(lng, lat, address)
+  map.value.setCenter([lng, lat])
+  emit('map-selected', { address, lat, lng })
+}
+
 // Watch for center changes
 watch(() => props.center, (newCenter) => {
   if (map.value && newCenter) {
     map.value.setCenter(newCenter)
   }
+}, { deep: true })
+
+// Watch for initialLocation changes (ví dụ khi parent truyền địa chỉ mới)
+watch(() => props.initialLocation, (loc) => {
+  if (!loc || !map.value) return
+  applyInitialLocation()
 }, { deep: true })
 
 // Watch for zoom changes
@@ -321,6 +344,13 @@ defineExpose({
     if (map.value) {
       map.value.setZoom(zoom)
     }
+  },
+  // Cho phép parent chọn vị trí từ bên ngoài (ví dụ khi có sẵn địa chỉ & toạ độ)
+  selectLocation: (lng: number, lat: number, address: string) => {
+    if (!map.value) return
+    createLocationMarker(lng, lat, address)
+    map.value.setCenter([lng, lat])
+    emit('map-selected', { address, lat, lng })
   }
 })
 </script>

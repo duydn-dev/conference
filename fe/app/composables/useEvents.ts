@@ -1,3 +1,5 @@
+import type { CreateEventDto, UpdateEventDto } from '~/types/event'
+
 export const useEvents = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase || 'http://localhost:3001'
@@ -5,7 +7,7 @@ export const useEvents = () => {
   const getPagination = async (options?: {
     page?: number
     limit?: number
-    status?: 'draft' | 'published' | 'closed' | 'cancelled'
+    status?: number // EventStatus enum value
     relations?: boolean
     search?: string
   }) => {
@@ -24,19 +26,7 @@ export const useEvents = () => {
     return await useFetch(`/events/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    code: string
-    name: string
-    description?: string
-    start_time: string | Date
-    end_time: string | Date
-    location_name?: string
-    location?: string
-    organizer_unit_id?: string
-    representative_name?: string
-    representative_identity?: string
-    status?: 'draft' | 'published' | 'closed' | 'cancelled'
-  }) => {
+  const create = async (data: CreateEventDto) => {
     return await useFetch('/events', {
       method: 'POST',
       body: data,
@@ -44,22 +34,7 @@ export const useEvents = () => {
     })
   }
 
-  const update = async (
-    id: string,
-    data: {
-      code?: string
-      name?: string
-      description?: string
-      start_time?: string | Date
-      end_time?: string | Date
-      location_name?: string
-      location?: string
-      organizer_unit_id?: string
-      representative_name?: string
-      representative_identity?: string
-      status?: 'draft' | 'published' | 'closed' | 'cancelled'
-    }
-  ) => {
+  const update = async (id: string, data: Partial<UpdateEventDto>) => {
     return await useFetch(`/events/${id}`, {
       method: 'PUT',
       body: data,

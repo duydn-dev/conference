@@ -4,6 +4,8 @@
     @update:visible="handleVisibleChange"
     modal 
     header="Chọn vị trí trên bản đồ" 
+    :draggable="false"
+    position="center"
     :style="{ width: '90vw', maxWidth: '900px' }"
     :closable="true"
     @hide="handleClose"
@@ -39,12 +41,18 @@ interface Props {
   visible?: boolean
   center?: [number, number] // [lng, lat]
   zoom?: number
+  initialLocation?: {
+    address: string;
+    lat: number;
+    lng: number;
+  } | null
 }
 
 const props = withDefaults(defineProps<Props>(), {
   visible: false,
   center: () => [108.2022, 16.0544] as [number, number],
-  zoom: 15
+  zoom: 15,
+  initialLocation: null
 })
 
 const emit = defineEmits<{
@@ -73,8 +81,21 @@ watch(() => props.center, (newCenter) => {
 // Watch for visible prop changes
 watch(() => props.visible, (newVisible) => {
   if (newVisible) {
-    selectedLocation.value = null
-    mapCenter.value = props.center
+    if (props.initialLocation) {
+      // Nếu có vị trí khởi tạo, chọn sẵn vị trí đó
+      selectedLocation.value = props.initialLocation
+      mapCenter.value = [props.initialLocation.lng, props.initialLocation.lat]
+      if (mapRef.value?.selectLocation) {
+        mapRef.value.selectLocation(
+          props.initialLocation.lng,
+          props.initialLocation.lat,
+          props.initialLocation.address
+        )
+      }
+    } else {
+      selectedLocation.value = null
+      mapCenter.value = props.center
+    }
   }
 })
 

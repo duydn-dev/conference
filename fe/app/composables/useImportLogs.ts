@@ -1,4 +1,9 @@
+import type { ImportLog, CreateImportLogDto } from '~/types/import-log'
+
 export const useImportLogs = () => {
+  const config = useRuntimeConfig()
+  const baseURL = config.public.apiBase || 'http://localhost:3001'
+
   const getPagination = async (options?: {
     page?: number
     limit?: number
@@ -10,26 +15,20 @@ export const useImportLogs = () => {
     if (options?.limit) query.limit = options.limit
     if (options?.event_id) query.event_id = options.event_id
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/api/import-logs', { query })
+    return await useFetch('/import-logs', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/api/import-logs/${id}`, { query })
+    return await useFetch(`/import-logs/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    event_id: string
-    file_name: string
-    imported_by?: string
-    total_rows: number
-    success_rows: number
-    failed_rows: number
-  }) => {
-    return await useFetch('/api/import-logs', {
+  const create = async (data: CreateImportLogDto) => {
+    return await useFetch('/import-logs', {
       method: 'POST',
-      body: data
+      body: data,
+      baseURL
     })
   }
 

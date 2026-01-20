@@ -1,3 +1,5 @@
+import type { OrganizerUnit, CreateOrganizerUnitDto, UpdateOrganizerUnitDto } from '~/types/organizer-unit'
+
 export const useOrganizerUnits = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase || 'http://localhost:3001'
@@ -22,12 +24,7 @@ export const useOrganizerUnits = () => {
     return await useFetch(`/organizer-units/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    name: string
-    contact_person?: string
-    contact_email?: string
-    contact_phone?: string
-  }) => {
+  const create = async (data: CreateOrganizerUnitDto) => {
     return await useFetch('/organizer-units', {
       method: 'POST',
       body: data,
@@ -35,17 +32,9 @@ export const useOrganizerUnits = () => {
     })
   }
 
-  const update = async (
-    id: string,
-    data: {
-      name?: string
-      contact_person?: string
-      contact_email?: string
-      contact_phone?: string
-    }
-  ) => {
+  const update = async (id: string, data: Partial<UpdateOrganizerUnitDto>) => {
     return await useFetch(`/organizer-units/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: data,
       baseURL
     })

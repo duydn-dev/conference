@@ -17,7 +17,11 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json"
+    "test:e2e": "jest --config ./test/jest-e2e.json",
+    "migration:run": "ts-node -r tsconfig-paths/register src/scripts/run-migrations.ts",
+    "migration:generate": "ts-node -r tsconfig-paths/register src/scripts/generate-migration.ts",
+    "migration:sync": "ts-node -r tsconfig-paths/register src/scripts/sync-database-from-entities.ts",
+    "migration:revert": "ts-node -r tsconfig-paths/register -e \"import { DataSource } from 'typeorm'; import config from './src/config/typeorm.config'; const ds = new DataSource(config); ds.initialize().then(() => ds.undoLastMigration()).then(() => process.exit(0)).catch(err => { console.error(err); process.exit(1); });\""
   },
   "dependencies": {
     "@nestjs/common": "^11.0.1",
@@ -31,12 +35,17 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.3",
     "dotenv": "^16.4.5",
+    "nest-winston": "^1.10.2",
     "pg": "^8.16.3",
     "reflect-metadata": "^0.2.2",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.1",
     "typeorm": "^0.3.28",
-    "uuid": "^11.0.3"
+    "uuid": "^11.0.3",
+    "winston": "^3.19.0",
+    "winston-daily-rotate-file": "^5.0.0",
+    "xlsx": "^0.18.5",
+    "node-fetch": "^3.3.2"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.2.0",

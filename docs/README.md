@@ -13,6 +13,9 @@ Hướng dẫn setup PostgreSQL và cấu hình TypeORM.
 ### [Database-First Guide](./DATABASE-FIRST.md)
 Hướng dẫn sử dụng Database-First approach với TypeORM.
 
+### [Database Migrations](./MIGRATIONS.md)
+Hướng dẫn sử dụng hệ thống migration để quản lý và sync database schema từ entities.
+
 ### [Docker Setup](./DOCKER.md)
 Hướng dẫn sử dụng Docker Compose để chạy PostgreSQL và pgAdmin.
 
@@ -43,7 +46,14 @@ Cấu trúc thư mục dự án Nuxt 4 và cách sử dụng các thư mục.
    - Copy `.env.example` thành `.env`
    - Điền thông tin database
 
-3. **Chạy dự án:**
+3. **Sync Database Schema:**
+   ```bash
+   # Tự động sync database từ entities
+   cd api
+   npm run migration:sync
+   ```
+
+4. **Chạy dự án:**
    ```bash
    npm run dev
    ```

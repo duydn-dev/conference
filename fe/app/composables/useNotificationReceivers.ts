@@ -1,4 +1,9 @@
+import type { NotificationReceiver, CreateNotificationReceiverDto, UpdateNotificationReceiverDto } from '~/types/notification-receiver'
+
 export const useNotificationReceivers = () => {
+  const config = useRuntimeConfig()
+  const baseURL = config.public.apiBase || 'http://localhost:3001'
+
   const getPagination = async (options?: {
     page?: number
     limit?: number
@@ -12,43 +17,42 @@ export const useNotificationReceivers = () => {
     if (options?.notification_id) query.notification_id = options.notification_id
     if (options?.participant_id) query.participant_id = options.participant_id
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/api/notification-receivers', { query })
+    return await useFetch('/notification-receivers', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/api/notification-receivers/${id}`, { query })
+    return await useFetch(`/notification-receivers/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    notification_id: string
-    participant_id: string
-    sent_at?: string | Date
-    read_at?: string | Date
-  }) => {
-    return await useFetch('/api/notification-receivers', {
+  const create = async (data: CreateNotificationReceiverDto) => {
+    return await useFetch('/notification-receivers', {
       method: 'POST',
-      body: data
+      body: data,
+      baseURL
     })
   }
 
-  const update = async (
-    id: string,
-    data: {
-      sent_at?: string | Date
-      read_at?: string | Date
-    }
-  ) => {
-    return await useFetch(`/api/notification-receivers/${id}`, {
+  const update = async (id: string, data: Partial<UpdateNotificationReceiverDto>) => {
+    return await useFetch(`/notification-receivers/${id}`, {
       method: 'PUT',
-      body: data
+      body: data,
+      baseURL
     })
   }
 
   const remove = async (id: string) => {
-    return await useFetch(`/api/notification-receivers/${id}`, {
-      method: 'DELETE'
+    return await useFetch(`/notification-receivers/${id}`, {
+      method: 'DELETE',
+      baseURL
+    })
+  }
+
+  const markAllAsReadByNotification = async (notificationId: string) => {
+    return await useFetch(`/notification-receivers/mark-read-by-notification/${notificationId}`, {
+      method: 'PATCH',
+      baseURL
     })
   }
 
@@ -57,6 +61,7 @@ export const useNotificationReceivers = () => {
     getById,
     create,
     update,
-    remove
+    remove,
+    markAllAsReadByNotification,
   }
 }

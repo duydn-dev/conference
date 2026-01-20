@@ -1,3 +1,5 @@
+import type { Participant, CreateParticipantDto, UpdateParticipantDto } from '~/types/participant'
+
 export const useParticipants = () => {
   const config = useRuntimeConfig()
   const baseURL = config.public.apiBase || 'http://localhost:3001'
@@ -24,14 +26,7 @@ export const useParticipants = () => {
     return await useFetch(`/participants/${id}`, { baseURL, query })
   }
 
-  const create = async (data: {
-    identity_number: string
-    full_name: string
-    email?: string
-    phone?: string
-    organization?: string
-    position?: string
-  }) => {
+  const create = async (data: CreateParticipantDto) => {
     return await useFetch('/participants', {
       method: 'POST',
       body: data,
@@ -39,17 +34,7 @@ export const useParticipants = () => {
     })
   }
 
-  const update = async (
-    id: string,
-    data: {
-      identity_number?: string
-      full_name?: string
-      email?: string
-      phone?: string
-      organization?: string
-      position?: string
-    }
-  ) => {
+  const update = async (id: string, data: Partial<UpdateParticipantDto>) => {
     return await useFetch(`/participants/${id}`, {
       method: 'PUT',
       body: data,

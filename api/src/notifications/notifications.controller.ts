@@ -17,10 +17,12 @@ export class NotificationsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('relations') relations?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.notificationsService.findAllWithPagination(pageNum, limitNum, search);
+    const includeRelations = relations === 'true';
+    return this.notificationsService.findAllWithPagination(pageNum, limitNum, search, includeRelations);
   }
 
   @Get(':id')

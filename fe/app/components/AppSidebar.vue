@@ -18,6 +18,15 @@
       <i :class="getIconClass('/events', 'pi-calendar')"></i>
     </NuxtLink>
     
+    <!-- Đơn vị tổ chức -->
+    <NuxtLink 
+      to="/organizer-units" 
+      v-tooltip.right="'Đơn vị tổ chức'"
+      :class="getLinkClass('/organizer-units')"
+    >
+      <i :class="getIconClass('/organizer-units', 'pi-building')"></i>
+    </NuxtLink>
+    
     <!-- Thông báo -->
     <NuxtLink 
       to="/notifications" 

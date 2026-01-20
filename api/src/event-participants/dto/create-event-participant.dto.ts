@@ -1,5 +1,5 @@
 import { IsString, IsOptional, IsUUID, IsEnum, IsInt } from 'class-validator';
-import { ParticipantStatus, ImportSource } from '../../events/entities/event-participant.entity';
+import { ParticipantStatus, ImportSource } from '../entities/event-participant.entity';
 
 export class CreateEventParticipantDto {
   @IsOptional()
