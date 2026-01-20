@@ -15,6 +15,7 @@
         ref="mapRef"
         :center="mapCenter"
         :zoom="zoom"
+        :initial-location="initialLocation"
         height="500px"
         @map-loaded="onMapLoaded"
         @map-selected="handleMapSelected"

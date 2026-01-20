@@ -267,7 +267,7 @@ const handleNotificationClick = async (item: any) => {
     if (!readNotificationIds.value.includes(item.id)) {
       readNotificationIds.value.push(item.id)
     }
-    // Điều hướng sang trang chi tiết / chỉnh sửa sự kiện
+    // Điều hướng sang trang chi tiết sự kiện
     const eventId = item.event?.id || item.event_id
     if (eventId) {
       showNotifications.value = false

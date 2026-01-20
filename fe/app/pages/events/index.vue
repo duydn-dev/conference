@@ -139,7 +139,7 @@
                 <Button 
                   icon="pi pi-pencil" 
                   class="p-button-text p-button-sm p-button-rounded text-gray-600 hover:text-sky-600"
-                  @click.stop="navigateTo(`/events/${event.id}`)"
+                  @click.stop="navigateTo(`/events/${event.id}/edit`)"
                   v-tooltip.top="'Chỉnh sửa'"
                 />
                 <Button 
