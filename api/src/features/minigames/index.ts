@@ -1,2 +1,1 @@
-export { MinigamesModule } from '../../minigames/minigames.module';
-
+export { MinigamesModule } from './minigames.module';

@@ -1,17 +1,17 @@
-import { 
-  Controller, 
-  Get, 
-  Post, 
-  Body, 
-  Patch, 
-  Param, 
-  Delete, 
+import {
+  Controller,
+  Get,
+  Post,
+  Body,
+  Patch,
+  Param,
+  Delete,
   Query,
   UseInterceptors,
   UploadedFile,
   BadRequestException,
   Res,
-  Logger
+  Logger,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -52,7 +52,7 @@ export class ParticipantsController {
       // Đọc file template có sẵn từ thư mục templates
       // Trong production: __dirname = dist/participants, cần lên 1 level để đến dist/templates
       // Trong development: __dirname = dist/participants (sau build) hoặc src/participants (khi chạy ts-node)
-      let templatePath = join(__dirname, '..', 'templates', 'import-khachmoi.xlsx');
+      let templatePath = join(__dirname, '..', '..', 'templates', 'import-khachmoi.xlsx');
       
       // Kiểm tra file có tồn tại không, nếu không thử đường dẫn khác
       try {
@@ -90,7 +90,7 @@ export class ParticipantsController {
         __dirname,
         cwd: process.cwd(),
         attemptedPaths: [
-          join(__dirname, '..', 'templates', 'import-khachmoi.xlsx'),
+          join(__dirname, '..', '..', 'templates', 'import-khachmoi.xlsx'),
           join(process.cwd(), 'dist', 'templates', 'import-khachmoi.xlsx'),
           join(process.cwd(), 'src', 'templates', 'import-khachmoi.xlsx'),
         ],
@@ -117,6 +117,15 @@ export class ParticipantsController {
     return this.participantsService.remove(id);
   }
 
+  @Post('by-identities')
+  async findByIdentities(@Body('identity_numbers') identityNumbers: string[]) {
+    if (!Array.isArray(identityNumbers) || identityNumbers.length === 0) {
+      throw new BadRequestException('identity_numbers must be a non-empty array');
+    }
+
+    return this.participantsService.findByIdentityNumbers(identityNumbers);
+  }
+
   @Post('import-excel')
   @UseInterceptors(FileInterceptor('file'))
   async importExcel(@UploadedFile() file: Express.Multer.File) {
@@ -138,14 +147,14 @@ export class ParticipantsController {
       if (jsonData.length === 0) {
         throw new BadRequestException('File Excel rỗng');
       }
-
+      console.log('jsonData', jsonData);
       // Import data
       const result = await this.participantsService.importFromExcel(jsonData);
-      
+
       return {
         message: 'Import thành công',
         total: jsonData.length,
-        ...result
+        ...result,
       };
     } catch (error) {
       throw new BadRequestException(`Lỗi khi import Excel: ${error.message}`);

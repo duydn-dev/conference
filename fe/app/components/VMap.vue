@@ -132,6 +132,7 @@ const createMapInstance = () => {
 }
 
 // Thêm control định vị vị trí
+const geolocateControlRef = ref<any>(null)
 const addGeolocateControl = () => {
   const geolocateControl = new window.vtmapgl.GeolocateControl({
     positionOptions: {
@@ -140,6 +141,7 @@ const addGeolocateControl = () => {
     trackUserLocation: true
   })
   map.value.addControl(geolocateControl)
+  geolocateControlRef.value = geolocateControl
 }
 
 // Thêm control tìm kiếm địa điểm
@@ -252,7 +254,29 @@ const setupMapLoadHandler = () => {
     emit('map-loaded', map.value)
     // Áp dụng vị trí khởi tạo nếu có
     applyInitialLocation()
+    
+    // Chỉ tự động trigger nút "Find my location" nếu không có initialLocation
+    // (để tránh override vị trí đã được truyền vào)
+    if (!props.initialLocation) {
+      setTimeout(() => {
+        triggerGeolocateButton()
+      }, 500)
+    }
   })
+}
+
+// Tự động click vào nút "Find my location"
+const triggerGeolocateButton = () => {
+  // Tìm button trong DOM
+  const geolocateButton = document.querySelector('.vtmapgl-ctrl-geolocate') as HTMLButtonElement
+  if (geolocateButton) {
+    geolocateButton.click()
+  } else {
+    // Nếu chưa tìm thấy, thử lại sau một chút
+    setTimeout(() => {
+      triggerGeolocateButton()
+    }, 200)
+  }
 }
 
 // Hàm chính khởi tạo map

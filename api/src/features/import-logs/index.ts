@@ -1,2 +1,1 @@
-export { ImportLogsModule } from '../../import-logs/import-logs.module';
-
+export { ImportLogsModule } from './import-logs.module';

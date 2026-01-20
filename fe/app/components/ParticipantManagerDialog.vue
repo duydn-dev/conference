@@ -40,7 +40,7 @@
       </div>
     </div>
 
-    <TabView>
+    <TabView v-model:activeIndex="activeTabIndex">
       <!-- Tab 1: Chọn từ danh sách -->
       <TabPanel value="0" header="Chọn từ danh sách">
         <div class="space-y-4">
@@ -59,18 +59,29 @@
 
           <DataTable
             :value="availableParticipants"
+            v-model:selection="selectedFromList"
             :rows="5"
             :paginator="true"
             :loading="searchingParticipants"
-            selectionMode="single"
-            @row-select="addParticipant"
+            selectionMode="checkbox"
+            dataKey="id"
             class="border border-gray-200 rounded-lg"
           >
+            <Column selectionMode="multiple" headerStyle="width: 3rem" />
             <Column field="full_name" header="Họ tên" />
             <Column field="identity_number" header="CMND/CCCD" />
             <Column field="email" header="Email" />
             <Column field="organization" header="Tổ chức" />
           </DataTable>
+          
+          <div class="flex justify-end mt-4">
+            <Button
+              label="Xác nhận"
+              icon="pi pi-check"
+              :disabled="selectedFromList.length === 0"
+              @click="addSelectedParticipants"
+            />
+          </div>
         </div>
       </TabPanel>
 
@@ -226,7 +237,7 @@
     </TabView>
 
     <!-- Dialog Footer with Confirm Button -->
-    <div class="mt-6 pt-4 border-t border-gray-200">
+    <div v-if="activeTabIndex !== 0" class="mt-6 pt-4 border-t border-gray-200">
       <div class="flex justify-between items-center w-full">
         <div class="text-sm text-gray-600">
           <span v-if="pendingParticipants.length > 0">
@@ -245,7 +256,6 @@
           <Button
             label="Xác nhận"
             icon="pi pi-check"
-            :disabled="pendingParticipants.length === 0"
             :loading="confirmingParticipants"
             @click="confirmParticipants"
           />
@@ -292,12 +302,27 @@ watch(
   () => props.modelValue,
   (val) => {
     internalVisible.value = val
+    // Khi dialog mở và đang ở tab "Chọn từ danh sách", load danh sách
+    if (val && activeTabIndex.value === 0) {
+      loadParticipantsForSelection()
+    }
   }
 )
 
 const onVisibleChange = (val: boolean) => {
   emit('update:modelValue', val)
 }
+
+// Tab state
+const activeTabIndex = ref(0)
+
+// Watch tab change để tự động load khi vào tab "Chọn từ danh sách"
+watch(activeTabIndex, async (newIndex) => {
+  if (newIndex === 0 && internalVisible.value) {
+    // Tab "Chọn từ danh sách" và dialog đang mở
+    await loadParticipantsForSelection()
+  }
+})
 
 // Selected & pending participants
 const selectedParticipants = ref<ParticipantLike[]>([...props.participants])
@@ -307,11 +332,26 @@ watch(
   () => props.participants,
   (val) => {
     selectedParticipants.value = [...(val || [])]
-  }
+    
+    // Nếu đang ở tab "Chọn từ danh sách" và dialog đang mở, cập nhật lại selectedFromList
+    if (activeTabIndex.value === 0 && internalVisible.value && availableParticipants.value.length > 0) {
+      if (val && val.length > 0) {
+        const selectedIds = new Set(val.map(p => p.id))
+        selectedFromList.value = availableParticipants.value.filter(
+          (p: Participant) => selectedIds.has(p.id)
+        )
+      } else {
+        // Nếu danh sách bên ngoài rỗng, không tích gì cả
+        selectedFromList.value = []
+      }
+    }
+  },
+  { deep: true }
 )
 
 // Search & available participants
 const availableParticipants = ref<Participant[]>([])
+const selectedFromList = ref<Participant[]>([])
 const participantSearch = ref('')
 const searchingParticipants = ref(false)
 
@@ -333,17 +373,60 @@ const selectedExcelFile = ref<File | null>(null)
 const selectedExcelFileName = ref<string>('')
 const importingExcel = ref(false)
 
-const searchParticipants = async () => {
+const loadParticipantsForSelection = async () => {
   try {
     searchingParticipants.value = true
+    
+    // Load danh sách tất cả khách mời
     const response = await getParticipants({
       page: 1,
-      limit: 50,
+      limit: 200,
       search: participantSearch.value
     })
     const result = (response.data.value as any)
     if (result) {
       availableParticipants.value = result.data || []
+      
+      // Ưu tiên dùng props.participants (danh sách từ bên ngoài) để set checked
+      // Điều này đảm bảo đồng bộ với UI bên ngoài khi người dùng đã xóa/thêm khách mời
+      if (props.participants && props.participants.length > 0) {
+        const selectedIds = new Set(props.participants.map(p => p.id))
+        selectedFromList.value = availableParticipants.value.filter(
+          (p: Participant) => selectedIds.has(p.id)
+        )
+      } else if (props.eventId) {
+        // Nếu không có props.participants nhưng có eventId, load từ event-participants
+        try {
+          const eventParticipantsResponse = await getEventParticipants({ 
+            event_id: props.eventId, 
+            limit: 200, 
+            relations: true 
+          })
+          const eventParticipantsResult = (eventParticipantsResponse.data.value as any)
+          if (eventParticipantsResult && eventParticipantsResult.data) {
+            const eventParticipantIds = new Set(
+              eventParticipantsResult.data.map((ep: any) => ep.participant_id)
+            )
+            
+            // Set checked cho những participants đã có trong sự kiện
+            selectedFromList.value = availableParticipants.value.filter(
+              (p: Participant) => eventParticipantIds.has(p.id)
+            )
+          } else {
+            // Nếu không có dữ liệu từ event-participants, không tích gì cả
+            selectedFromList.value = []
+          }
+        } catch (error) {
+          console.error('Error loading event participants:', error)
+          selectedFromList.value = []
+        }
+      } else {
+        // Nếu không có eventId và không có props.participants, dùng selectedParticipants internal
+        const selectedIds = new Set(selectedParticipants.value.map(p => p.id))
+        selectedFromList.value = availableParticipants.value.filter(
+          (p: Participant) => selectedIds.has(p.id)
+        )
+      }
     }
   } catch (error) {
     console.error('Error loading participants:', error)
@@ -353,23 +436,78 @@ const searchParticipants = async () => {
   }
 }
 
-const addParticipant = (event: any) => {
-  const participant = event.data as ParticipantLike
-  if (
-    !pendingParticipants.value.find(p => p.id === participant.id) &&
-    !selectedParticipants.value.find(p => p.id === participant.id)
-  ) {
-    pendingParticipants.value.push({
+const searchParticipants = async () => {
+  await loadParticipantsForSelection()
+}
+
+const addSelectedParticipants = () => {
+  // Lấy danh sách ID của các participants đang được chọn trong tab "Chọn từ danh sách"
+  const selectedIds = new Set(selectedFromList.value.map(p => p.id))
+  
+  // Lấy danh sách ID của các participants hiện có trong selectedParticipants
+  const currentSelectedIds = new Set(selectedParticipants.value.map(p => p.id))
+  
+  // Tìm các participants cần thêm (có trong selectedFromList nhưng chưa có trong selectedParticipants)
+  const toAdd = selectedFromList.value.filter(p => !currentSelectedIds.has(p.id))
+  
+  // Tìm các participants cần xóa (có trong selectedParticipants nhưng không có trong selectedFromList)
+  // Chỉ xóa những participants có trong availableParticipants (tức là từ tab "Chọn từ danh sách")
+  const availableIds = new Set(availableParticipants.value.map(p => p.id))
+  const toRemove = selectedParticipants.value.filter(
+    p => availableIds.has(p.id) && !selectedIds.has(p.id)
+  )
+  
+  // Thêm các participants mới
+  let addedCount = 0
+  for (const participant of toAdd) {
+    selectedParticipants.value.push({
       ...participant,
       is_receptionist: (participant as any).is_receptionist || false
     })
+    addedCount++
+  }
+  
+  // Xóa các participants đã bị bỏ tích
+  let removedCount = 0
+  for (const participant of toRemove) {
+    const index = selectedParticipants.value.findIndex(p => p.id === participant.id)
+    if (index !== -1) {
+      selectedParticipants.value.splice(index, 1)
+      removedCount++
+    }
+  }
+  
+  // Emit về parent để đồng bộ với trang thêm/sửa event
+  emit('update:participants', [...selectedParticipants.value])
+  
+  // Hiển thị thông báo
+  if (addedCount > 0 || removedCount > 0) {
+    const messages = []
+    if (addedCount > 0) {
+      messages.push(`Đã thêm ${addedCount} khách mời`)
+    }
+    if (removedCount > 0) {
+      messages.push(`Đã xóa ${removedCount} khách mời`)
+    }
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: messages.join(', '),
+      life: 3000
+    })
+  } else {
     toast.add({
       severity: 'info',
-      summary: 'Đã thêm',
-      detail: `${participant.full_name} đã được thêm vào danh sách chờ xác nhận`,
-      life: 2000
+      summary: 'Thông báo',
+      detail: 'Không có thay đổi nào',
+      life: 3000
     })
   }
+  
+  // Đóng dialog sau khi xác nhận
+  internalVisible.value = false
+  emit('update:modelValue', false)
 }
 
 const handleCreateNewParticipant = async () => {
@@ -414,6 +552,9 @@ const handleCreateNewParticipant = async () => {
       }
 
       resetNewParticipantForm()
+      
+      // Tự động xác nhận và đóng dialog sau khi tạo mới thành công
+      await confirmParticipants()
     }
   } catch (error: any) {
     console.error('Error creating participant:', error)
@@ -455,7 +596,7 @@ const downloadParticipantExcelTemplate = async () => {
       responseType: 'blob'
     })
 
-    const blob = response as Blob
+    const blob = response as unknown as Blob
     const downloadUrl = window.URL.createObjectURL(blob)
     const link = document.createElement('a')
     link.href = downloadUrl
@@ -506,32 +647,45 @@ const handleImportExcel = async () => {
 
     const result = response as any
 
-    if (result.participants && Array.isArray(result.participants)) {
-      result.participants.forEach((participant: any) => {
-        if (
-          !pendingParticipants.value.find(p => p.id === participant.id) &&
-          !selectedParticipants.value.find(p => p.id === participant.id)
-        ) {
-          pendingParticipants.value.push({
-            ...participant,
-            is_receptionist: participant.is_receptionist || false
-          })
-        }
-      })
+    // Thông báo kết quả import
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: `Import thành công ${result.success || 0} khách mời`,
+      life: 3000
+    })
 
-      toast.add({
-        severity: 'success',
-        summary: 'Thành công',
-        detail: `Đã import ${result.success || result.participants.length || 0} khách mời vào danh sách chờ xác nhận`,
-        life: 3000
-      })
-    } else {
-      toast.add({
-        severity: 'success',
-        summary: 'Thành công',
-        detail: `Import thành công ${result.success || 0} khách mời`,
-        life: 3000
-      })
+    // Nếu backend trả về danh sách identity_number thì gọi API lấy danh sách Participant tương ứng
+    const identityNumbers: string[] = result.identity_numbers || []
+    if (identityNumbers.length > 0) {
+      try {
+        const importedParticipants = await $fetch('/api/participants/by-identities', {
+          method: 'POST',
+          body: {
+            identity_numbers: identityNumbers
+          }
+        })
+
+        const participantsList = importedParticipants as any[]
+
+        // Đổ lại dữ liệu vào tab "Chọn từ danh sách"
+        availableParticipants.value = participantsList
+
+        // Đồng thời in ra màn thêm mới/sửa event
+        selectedParticipants.value = [...participantsList]
+        emit('update:participants', [...selectedParticipants.value])
+
+        // Chuyển sang tab "Chọn từ danh sách"
+        activeTabIndex.value = 0
+      } catch (error: any) {
+        console.error('Error loading participants by identities:', error)
+        toast.add({
+          severity: 'error',
+          summary: 'Lỗi',
+          detail: error.data?.message || 'Không thể tải danh sách khách mời sau khi import',
+          life: 3000
+        })
+      }
     }
 
     selectedExcelFile.value = null
@@ -540,6 +694,7 @@ const handleImportExcel = async () => {
       excelInputRef.value.value = ''
     }
 
+    // Sau import, có thể load lại danh sách tìm kiếm nếu cần
     await searchParticipants()
   } catch (error: any) {
     console.error('Error importing Excel:', error)
@@ -568,9 +723,40 @@ const confirmingParticipants = ref(false)
 
 const confirmParticipants = async () => {
   try {
+    // Nếu đang ở tab "Chọn từ danh sách", đồng bộ danh sách từ tab đó trước
+    if (activeTabIndex.value === 0) {
+      // Đồng bộ selectedParticipants với selectedFromList
+      const selectedIds = new Set(selectedFromList.value.map(p => p.id))
+      const availableIds = new Set(availableParticipants.value.map(p => p.id))
+      
+      // Xóa các participants từ tab "Chọn từ danh sách" đã bị bỏ tích
+      selectedParticipants.value = selectedParticipants.value.filter(
+        p => !availableIds.has(p.id) || selectedIds.has(p.id)
+      )
+      
+      // Thêm các participants mới được chọn
+      const currentSelectedIds = new Set(selectedParticipants.value.map(p => p.id))
+      for (const participant of selectedFromList.value) {
+        if (!currentSelectedIds.has(participant.id)) {
+          selectedParticipants.value.push({
+            ...participant,
+            is_receptionist: (participant as any).is_receptionist || false
+          })
+        }
+      }
+    }
+    
     // Nếu người dùng đã chọn file Excel nhưng chưa bấm import, thì import trước
     if (selectedExcelFile.value && pendingParticipants.value.length === 0) {
       await handleImportExcel()
+    }
+
+    if (pendingParticipants.value.length === 0 && activeTabIndex.value === 0) {
+      // Nếu chỉ có thay đổi từ tab "Chọn từ danh sách" và không có pending, emit và đóng dialog
+      emit('update:participants', [...selectedParticipants.value])
+      internalVisible.value = false
+      emit('update:modelValue', false)
+      return
     }
 
     if (pendingParticipants.value.length === 0) {
@@ -667,8 +853,6 @@ const confirmParticipants = async () => {
 
 // Nếu truyền eventId thì load sẵn danh sách khách mời của event đó
 onMounted(async () => {
-  await searchParticipants()
-
   if (props.eventId) {
     try {
       const response = await getEventParticipants({ event_id: props.eventId, limit: 200, relations: true })
@@ -688,6 +872,11 @@ onMounted(async () => {
     } catch (error) {
       console.error('Error loading event participants:', error)
     }
+  }
+  
+  // Load danh sách khi mở dialog nếu đang ở tab "Chọn từ danh sách"
+  if (activeTabIndex.value === 0) {
+    await loadParticipantsForSelection()
   }
 })
 </script>

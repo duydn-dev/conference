@@ -1,2 +1,1 @@
-export { MinigameResultsModule } from '../../minigame-results/minigame-results.module';
-
+export { MinigameResultsModule } from './minigame-results.module';

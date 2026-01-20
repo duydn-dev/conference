@@ -91,27 +91,27 @@
 
           <div v-if="uploadedFilesList.length > 0">
             <h5 class="text-lg font-semibold mb-4">Đã upload</h5>
-            <div class="flex flex-wrap gap-4">
+            <div class="flex flex-wrap gap-3">
               <div 
                 v-for="(file, index) of uploadedFilesList" 
                 :key="file.url || file.name" 
-                class="p-4 rounded-lg flex flex-col border border-gray-300 items-center gap-3"
+                class="p-3 rounded-lg flex flex-col border border-gray-300 items-center gap-2 min-w-[120px] max-w-[150px] flex-1"
               >
-                <div>
+                <div class="relative">
                   <img 
                     v-if="file.url && (file.type?.startsWith('image/') || isImageFileByName(file.name || file.url))" 
                     role="presentation" 
                     :alt="file.name" 
                     :src="getFullUrl(file.url)" 
-                    class="w-24 h-24 object-cover rounded"
+                    class="w-20 h-20 object-cover rounded"
                   />
-                  <i v-else class="pi pi-file text-4xl text-gray-400"></i>
+                  <i v-else class="pi pi-file text-3xl text-gray-400"></i>
                 </div>
-                <span class="font-semibold text-sm text-ellipsis max-w-[200px] whitespace-nowrap overflow-hidden">
+                <span class="font-semibold text-xs text-center text-ellipsis w-full overflow-hidden" :title="file.name">
                   {{ file.name }}
                 </span>
                 <div class="text-xs text-gray-500">{{ formatSize(file.size) }}</div>
-                <Tag value="Hoàn thành" severity="success" />
+                <Tag value="Hoàn thành" severity="success" class="text-xs" />
                 <Button 
                   icon="pi pi-times" 
                   @click="removeUploadedFile(index)" 
@@ -119,6 +119,7 @@
                   rounded 
                   severity="danger"
                   size="small"
+                  class="mt-1"
                 />
               </div>
             </div>
@@ -137,9 +138,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import PrimeFileUpload from 'primevue/fileupload'
 import { useToastSafe } from '~/composables/useToastSafe'
+import { useFileUrl } from '~/composables/useFileUrl'
 
 interface Props {
   modelValue?: string | string[] | null
@@ -172,6 +174,50 @@ const uploadedFilesList = ref<Array<{ url: string; name: string; size: number; t
 
 // Sử dụng composable để xử lý file URL
 const { getFullUrl } = useFileUrl()
+
+// Đồng bộ giá trị modelValue ban đầu vào danh sách uploadedFilesList
+// để khi vào màn edit (đã có path avatar / file) thì vẫn hiển thị preview
+const syncModelValueToUploadedList = (value: string | string[] | null | undefined) => {
+  uploadedFilesList.value = []
+
+  if (!value) return
+
+  if (Array.isArray(value)) {
+    if (!props.isMultiple) {
+      // Nếu isMultiple=false nhưng modelValue lại là array, lấy phần tử đầu tiên
+      const first = value[0]
+      if (first) {
+        uploadedFilesList.value = [{
+          url: first,
+          name: first.split('/').pop() || 'file',
+          size: 0
+        }]
+      }
+      return
+    }
+
+    uploadedFilesList.value = value.map((path) => ({
+      url: path,
+      name: path.split('/').pop() || 'file',
+      size: 0
+    }))
+  } else if (typeof value === 'string' && value.trim() !== '') {
+    uploadedFilesList.value = [{
+      url: value,
+      name: value.split('/').pop() || 'file',
+      size: 0
+    }]
+  }
+}
+
+// Watch để khi vào màn edit có sẵn modelValue thì tự sync ra preview
+watch(
+  () => props.modelValue,
+  (val) => {
+    syncModelValueToUploadedList(val)
+  },
+  { immediate: true, deep: true }
+)
 
 const maxFileSizeMB = computed(() => {
   return (props.maxFileSize / 1000000).toFixed(0)

@@ -1,2 +1,1 @@
-export { EventDocumentsModule } from '../../event-documents/event-documents.module';
-
+export { EventDocumentsModule } from './event-documents.module';

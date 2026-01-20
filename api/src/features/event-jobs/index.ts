@@ -1,2 +1,1 @@
-export { EventJobsModule } from '../../event-jobs/event-jobs.module';
-
+export { EventJobsModule } from './event-jobs.module';

@@ -25,7 +25,7 @@
       <form @submit.prevent="handleSubmit">
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
           <!-- Mã sự kiện -->
-          <div class="md:col-span-2">
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Mã sự kiện <span class="text-red-500">*</span>
             </label>
@@ -39,7 +39,7 @@
           </div>
 
           <!-- Tên sự kiện -->
-          <div class="md:col-span-2">
+          <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Tên sự kiện <span class="text-red-500">*</span>
             </label>
@@ -129,7 +129,7 @@
           </div>
 
           <!-- Địa chỉ -->
-          <div>
+          <div class="hidden">
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Địa chỉ
             </label>
@@ -201,34 +201,8 @@
             <label class="block text-sm font-medium text-gray-700 mb-2">
               Tài liệu đính kèm
             </label>
-            
-            <!-- Existing documents -->
-            <div v-if="existingDocuments.length > 0" class="mb-3 space-y-2">
-              <div 
-                v-for="doc in existingDocuments" 
-                :key="doc.id"
-                class="flex items-center justify-between p-3 border border-gray-200 rounded-lg"
-              >
-                <div class="flex items-center gap-3">
-                  <i class="pi pi-file text-2xl text-gray-400"></i>
-                  <div>
-                    <p class="font-medium text-sm">{{ doc.file_name }}</p>
-                    <p class="text-xs text-gray-500">{{ doc.file_type?.toUpperCase() }}</p>
-                  </div>
-                </div>
-                <Button 
-                  icon="pi pi-trash" 
-                  severity="danger" 
-                  text 
-                  rounded
-                  @click="removeExistingDocument(doc.id)"
-                />
-              </div>
-            </div>
-
-            <!-- New documents upload -->
             <VFileUpload 
-              v-model="newDocuments" 
+              v-model="documents" 
               :isMultiple="true" 
               accept="image/*,application/pdf"
               :maxFileSize="10000000"
@@ -309,13 +283,14 @@
       v-model:visible="showMapModal"
       :center="mapCenter"
       :zoom="15"
+      :initial-location="initialMapLocation"
       @location-selected="handleLocationSelected"
     />
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useEvents } from '~/composables/useEvents'
 import { useOrganizerUnits } from '~/composables/useOrganizerUnits'
 import { useEventDocuments } from '~/composables/useEventDocuments'
@@ -338,7 +313,7 @@ const { getById, update } = useEvents()
 const { getPagination: getOrganizerUnits } = useOrganizerUnits()
 const { getPagination: getDocuments, create: createDocument, remove: removeDocument } = useEventDocuments()
 const { getPagination: getEventParticipants, create: createEventParticipant, remove: removeEventParticipant } = useEventParticipants()
-const { getPagination: getParticipants, create: createParticipant } = useParticipants()
+const { getById: getParticipantById } = useParticipants()
 
 const loading = ref(true)
 const submitting = ref(false)
@@ -348,8 +323,8 @@ const errors = ref<Record<string, string>>({})
 
 // Documents state
 const existingDocuments = ref<EventDocument[]>([])
-const newDocuments = ref<string[] | null>(null)
-const documentsToDelete = ref<string[]>([])
+// Mảng path tài liệu, bind trực tiếp vào VFileUpload giống avatar
+const documents = ref<string[] | null>(null)
 
 // Participants state (dùng cho component ParticipantManagerDialog)
 const showParticipantDialog = ref(false)
@@ -358,6 +333,20 @@ const selectedParticipants = ref<any[]>([]) // Will include both Participant dat
 // Map modal state
 const showMapModal = ref(false)
 const mapCenter = ref<[number, number]>([108.2022, 16.0544] as [number, number])
+
+const initialMapLocation = computed(() => {
+  if (!formData.value.location || !formData.value.location_name) return null
+  const parts = String(formData.value.location).split(',').map((p: string) => p.trim())
+  if (parts.length !== 2) return null
+  const lat = parseFloat(parts[0] || '0')
+  const lng = parseFloat(parts[1] || '0')
+  if (Number.isNaN(lat) || Number.isNaN(lng)) return null
+  return {
+    address: formData.value.location_name,
+    lat,
+    lng
+  }
+})
 
 const formData = ref({
   code: '',
@@ -385,8 +374,26 @@ const loadEvent = async () => {
   try {
     loading.value = true
     const eventId = route.params.id as string
+    
+    if (!eventId) {
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không tìm thấy ID sự kiện', life: 3000 })
+      navigateTo('/events')
+      return
+    }
+    
     const response = await getById(eventId)
+    console.log('Response:', response.data);
+    console.log('eventId:', eventId);
+    
+    if (response.error.value) {
+      console.error('Error loading event:', response.error.value)
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải thông tin sự kiện', life: 3000 })
+      navigateTo('/events')
+      return
+    }
+    
     const event = (response.data.value as any)
+    console.log('Loaded event:', event)
     
     if (event) {
       formData.value = {
@@ -401,8 +408,13 @@ const loadEvent = async () => {
         organizer_unit_id: event.organizer_unit_id || null,
         representative_name: event.representative_name || '',
         representative_identity: event.representative_identity || '',
-        status: event.status || EventStatus.DRAFT
+        status: event.status !== undefined ? event.status : EventStatus.DRAFT
       }
+      console.log('FormData after load:', formData.value)
+    } else {
+      console.warn('Event data is null or undefined')
+      toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không tìm thấy thông tin sự kiện', life: 3000 })
+      // navigateTo('/events')
     }
   } catch (error) {
     console.error('Error loading event:', error)
@@ -448,9 +460,69 @@ const loadDocuments = async () => {
     const result = (response.data.value as any)
     if (result) {
       existingDocuments.value = result.data || []
+      // Đồng bộ path vào documents để VFileUpload hiển thị giống avatar
+      documents.value = existingDocuments.value.map((d) => d.file_path)
     }
   } catch (error) {
     console.error('Error loading documents:', error)
+  }
+}
+
+const loadParticipants = async () => {
+  try {
+    const eventId = route.params.id as string
+    const response = await getEventParticipants({ 
+      event_id: eventId, 
+      limit: 200, 
+      relations: true 
+    })
+    const result = (response.data.value as any)
+
+    if (result && result.data) {
+      const eventParticipants = result.data as any[]
+      const participantsMap: Record<string, any> = {}
+      const fetchPromises: Promise<void>[] = []
+
+      // Ưu tiên dùng dữ liệu participant từ relations (nếu backend trả về)
+      for (const ep of eventParticipants) {
+        if (ep.participant && ep.participant_id) {
+          participantsMap[ep.participant_id] = ep.participant
+        } else if (ep.participant_id && !participantsMap[ep.participant_id]) {
+          // Nếu không có quan hệ participant, gọi thêm API participants để lấy đầy đủ thông tin
+          fetchPromises.push(
+            (async () => {
+              try {
+                const res = await getParticipantById(ep.participant_id)
+                if (!res.error.value && res.data.value) {
+                  participantsMap[ep.participant_id] = res.data.value as any
+                }
+              } catch (err) {
+                console.error('Error loading participant detail:', err)
+              }
+            })()
+          )
+        }
+      }
+
+      if (fetchPromises.length > 0) {
+        await Promise.all(fetchPromises)
+      }
+
+      selectedParticipants.value = eventParticipants.map((ep: any) => {
+        const p = participantsMap[ep.participant_id] || ep.participant || {}
+        return {
+          id: ep.participant_id,
+          relationId: ep.id,
+          full_name: p.full_name || '',
+          identity_number: p.identity_number || '',
+          email: p.email || '',
+          phone: p.phone || '',
+          organization: p.organization || ''
+        }
+      })
+    }
+  } catch (error) {
+    console.error('Error loading participants:', error)
   }
 }
 
@@ -459,11 +531,6 @@ const removeParticipant = (participantId: string) => {
   if (index !== -1) {
     selectedParticipants.value.splice(index, 1)
   }
-}
-
-const removeExistingDocument = (docId: string) => {
-  documentsToDelete.value.push(docId)
-  existingDocuments.value = existingDocuments.value.filter(d => d.id !== docId)
 }
 
 const validate = () => {
@@ -509,7 +576,83 @@ const handleSubmit = async () => {
       organizer_unit_id: formData.value.organizer_unit_id || undefined
     }
     
+    // Step 1: Update event
     await update(eventId, data)
+    
+    // Step 2: Đồng bộ tài liệu đính kèm (giống avatar, dùng VFileUpload)
+    const currentDocs = existingDocuments.value
+    const currentPaths = new Set(currentDocs.map(d => d.file_path))
+    const newPaths = new Set(documents.value || [])
+
+    // 2a. Xóa những tài liệu không còn trong danh sách mới
+    for (const doc of currentDocs) {
+      if (!newPaths.has(doc.file_path)) {
+        try {
+          await removeDocument(doc.id)
+        } catch (docError) {
+          console.error('Error deleting document:', docError)
+        }
+      }
+    }
+
+    // 2b. Thêm những tài liệu mới (có path nhưng chưa có trong existingDocuments)
+    for (const filePath of newPaths) {
+      if (!currentPaths.has(filePath)) {
+        try {
+          const fileName = filePath.split('/').pop() || 'unknown'
+          await createDocument({
+            event_id: eventId,
+            file_name: fileName,
+            file_path: filePath,
+            file_type: fileName.split('.').pop() || 'unknown'
+          })
+        } catch (docError) {
+          console.error('Error creating document:', docError)
+        }
+      }
+    }
+    
+    // Step 3: Update event participants
+    // Get current participants from event
+    const currentParticipantsResponse = await getEventParticipants({ 
+      event_id: eventId, 
+      limit: 200 
+    })
+    const currentParticipantsResult = (currentParticipantsResponse.data.value as any)
+    const currentParticipantIds = new Set(
+      (currentParticipantsResult?.data || []).map((ep: any) => ep.participant_id)
+    )
+    
+    // Get selected participant IDs
+    const selectedParticipantIds = new Set(selectedParticipants.value.map(p => p.id))
+    
+    // Remove participants that are no longer selected
+    for (const ep of (currentParticipantsResult?.data || [])) {
+      if (!selectedParticipantIds.has(ep.participant_id)) {
+        try {
+          await removeEventParticipant(ep.id)
+        } catch (partError) {
+          console.error('Error removing event participant:', partError)
+        }
+      }
+    }
+    
+    // Add new participants that are not in current list
+    for (const participant of selectedParticipants.value) {
+      if (!currentParticipantIds.has(participant.id)) {
+        try {
+          await createEventParticipant({
+            event_id: eventId,
+            participant_id: participant.id,
+            status: ParticipantStatus.REGISTERED,
+            source: ImportSource.MANUAL
+          })
+        } catch (partError) {
+          console.error('Error creating event participant:', partError)
+        }
+      }
+    }
+    
     toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã cập nhật sự kiện thành công', life: 3000 })
     navigateTo('/events')
   } catch (error: any) {
@@ -523,7 +666,14 @@ const handleSubmit = async () => {
 
 const openMapModal = () => {
   if (formData.value.location && formData.value.location_name) {
-    mapCenter.value = [108.2022, 16.0544]
+    const parts = String(formData.value.location).split(',').map((p: string) => p.trim())
+    if (parts.length === 2) {
+      const lat = parseFloat(parts[0] || '0')
+      const lng = parseFloat(parts[1] || '0')
+      if (!Number.isNaN(lat) && !Number.isNaN(lng)) {
+        mapCenter.value = [lng, lat]
+      }
+    }
   }
   showMapModal.value = true
 }
@@ -534,11 +684,18 @@ const handleLocationSelected = (location: { address: string; lat: number; lng: n
 }
 
 onMounted(async () => {
-  await Promise.all([
-    loadEvent(), 
+  console.log('onMounted')
+  // Load event first (required), then load other data
+  await loadEvent()
+  
+  // Load other data in parallel (non-blocking)
+  Promise.all([
     loadOrganizerUnits(), 
-    loadDocuments()
-  ])
+    loadDocuments(),
+    loadParticipants()
+  ]).catch((error) => {
+    console.error('Error loading additional data:', error)
+  })
 })
 </script>
 

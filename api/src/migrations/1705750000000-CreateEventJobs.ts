@@ -73,15 +73,19 @@ export class CreateEventJobs1705750000000 implements MigrationInterface {
         }),
       );
 
-      await queryRunner.createForeignKey(
-        'event_jobs',
-        new TableForeignKey({
-          columnNames: ['event_id'],
-          referencedTableName: 'events',
-          referencedColumnNames: ['id'],
-          onDelete: 'CASCADE',
-        }),
-      );
+      // Chỉ tạo foreign key nếu bảng events đã tồn tại (trên DB mới có thể chưa có schema này)
+      const hasEventsTable = await queryRunner.hasTable('events');
+      if (hasEventsTable) {
+        await queryRunner.createForeignKey(
+          'event_jobs',
+          new TableForeignKey({
+            columnNames: ['event_id'],
+            referencedTableName: 'events',
+            referencedColumnNames: ['id'],
+            onDelete: 'CASCADE',
+          }),
+        );
+      }
     }
   }
 

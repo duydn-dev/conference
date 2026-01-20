@@ -95,6 +95,17 @@ export class EventParticipantsService {
     return eventParticipant;
   }
 
+  async findByEventId(eventId: string): Promise<EventParticipant[]> {
+    this.logger.debug(`Finding event-participants by event id: ${eventId}`);
+    
+    const eventParticipants = await this.eventParticipantsRepository.find({
+      where: { event_id: eventId },
+    });
+    
+    this.logger.log(`Found ${eventParticipants.length} event-participants for event ${eventId}`);
+    return eventParticipants;
+  }
+
   async update(id: string, dto: UpdateEventParticipantDto): Promise<EventParticipant> {
     this.logger.log(`Updating event-participant: ${id}`);
     

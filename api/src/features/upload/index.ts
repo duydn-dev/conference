@@ -1,2 +1,1 @@
-export { UploadModule } from '../../upload/upload.module';
-
+export { UploadModule } from './upload.module';

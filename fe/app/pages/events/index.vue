@@ -62,7 +62,7 @@
           <div class="relative h-48 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500 overflow-hidden">
             <div v-if="event.avatar" class="absolute inset-0">
               <img 
-                :src="event.avatar" 
+                :src="getFullUrl(event.avatar)" 
                 :alt="event.name"
                 class="w-full h-full object-cover"
               />
@@ -217,6 +217,7 @@ import { useRoute } from 'vue-router'
 import { useEvents } from '~/composables/useEvents'
 import { useToast } from 'primevue/usetoast'
 import { formatDateTime, formatDateShort } from '~/utils/helpers'
+import { useFileUrl } from '~/composables/useFileUrl'
 
 useHead({
   title: 'Danh sách sự kiện'
@@ -224,6 +225,7 @@ useHead({
 
 const toast = process.client ? useToast() : null
 const { getPagination, remove } = useEvents()
+const { getFullUrl } = useFileUrl()
 const route = useRoute()
 
 const events = ref([])

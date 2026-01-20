@@ -1,2 +1,1 @@
-export { ParticipantsModule } from '../../participants/participants.module';
-
+export { ParticipantsModule } from './participants.module';

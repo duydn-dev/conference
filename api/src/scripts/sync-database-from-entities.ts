@@ -54,41 +54,63 @@ async function syncDatabaseFromEntities() {
       console.log(`  - ${relativePath}`);
     });
 
-    // Check for missing columns
-    console.log('\nChecking database schema...');
-    
+    // 1) Đồng bộ schema từ entities (không drop bảng/cột hiện có)
+    console.log('\nSynchronizing database schema from entities (create missing tables/columns)...');
+    await dataSource.synchronize(false);
+    console.log('✅ Schema synchronized from entities.');
+
+    // 2) Các bước kiểm tra/bổ sung thủ công tiếp theo
+    console.log('\nChecking database schema for custom adjustments...');
+
     // Check participants.is_receptionist
-    const participantsTable = await dataSource.query(`
-      SELECT column_name, data_type, is_nullable, column_default
-      FROM information_schema.columns
-      WHERE table_name = 'participants'
-      ORDER BY ordinal_position
-    `);
-
-    console.log('\nCurrent participants table columns:');
-    participantsTable.forEach((col: any) => {
-      console.log(`  - ${col.column_name} (${col.data_type})`);
-    });
-
-    // Check if is_receptionist exists
-    const hasIsReceptionist = participantsTable.some((col: any) => col.column_name === 'is_receptionist');
-    
-    if (!hasIsReceptionist) {
-      console.log('\n⚠️  Column is_receptionist is missing in participants table');
-      console.log('Running migration to add is_receptionist column...');
-      
-      await dataSource.query(`
-        ALTER TABLE participants 
-        ADD COLUMN IF NOT EXISTS is_receptionist BOOLEAN NOT NULL DEFAULT FALSE
+    let participantsTable: any[] = [];
+    try {
+      participantsTable = await dataSource.query(`
+        SELECT column_name, data_type, is_nullable, column_default
+        FROM information_schema.columns
+        WHERE table_name = 'participants'
+        ORDER BY ordinal_position
       `);
-      
-      await dataSource.query(`
-        COMMENT ON COLUMN participants.is_receptionist IS 'Người đón tiếp - true nếu cần đón tiếp, false nếu không'
-      `);
-      
-      console.log('✅ Column is_receptionist added successfully');
+    } catch (err: any) {
+      console.warn(
+        '\n⚠️  Failed to inspect participants table. It may not exist yet. Skipping is_receptionist check.',
+      );
+      console.warn('   Underlying error:', err?.message || err);
+    }
+
+    if (participantsTable.length === 0) {
+      console.log(
+        '\nℹ️  participants table does not exist yet. No ALTER COLUMN needed. ' +
+          'Create tables from entities / migrations first, then re-run this script if necessary.',
+      );
     } else {
-      console.log('\n✅ Column is_receptionist already exists');
+      console.log('\nCurrent participants table columns:');
+      participantsTable.forEach((col: any) => {
+        console.log(`  - ${col.column_name} (${col.data_type})`);
+      });
+
+      // Check if is_receptionist exists
+      const hasIsReceptionist = participantsTable.some(
+        (col: any) => col.column_name === 'is_receptionist',
+      );
+
+      if (!hasIsReceptionist) {
+        console.log('\n⚠️  Column is_receptionist is missing in participants table');
+        console.log('Running migration to add is_receptionist column...');
+
+        await dataSource.query(`
+          ALTER TABLE participants 
+          ADD COLUMN IF NOT EXISTS is_receptionist BOOLEAN NOT NULL DEFAULT FALSE
+        `);
+
+        await dataSource.query(`
+          COMMENT ON COLUMN participants.is_receptionist IS 'Người đón tiếp - true nếu cần đón tiếp, false nếu không'
+        `);
+
+        console.log('✅ Column is_receptionist added successfully');
+      } else {
+        console.log('\n✅ Column is_receptionist already exists');
+      }
     }
 
     // Check other tables and columns from entities

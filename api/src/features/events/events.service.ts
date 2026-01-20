@@ -5,6 +5,7 @@ import { CreateEventDto } from './dto/create-event.dto';
 import { UpdateEventDto } from './dto/update-event.dto';
 import { Event } from './entities/event.entity';
 import { EventJobsService } from '../event-jobs/event-jobs.service';
+import { NotificationsService } from '../notifications/notifications.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -15,6 +16,7 @@ export class EventsService {
     @InjectRepository(Event)
     private readonly eventsRepository: Repository<Event>,
     private readonly eventJobsService: EventJobsService,
+    private readonly notificationsService: NotificationsService,
   ) {}
 
   async findAllWithPagination(page = 1, limit = 10, search?: string) {
@@ -66,6 +68,17 @@ export class EventsService {
       // Tạo các job nhắc sự kiện (1 ngày, 4h, 1h trước khi bắt đầu)
       await this.eventJobsService.scheduleEventReminderJobs(savedEvent);
 
+      // Tạo notification + hook để gọi API hệ thống khác khi thêm mới sự kiện
+      try {
+        await this.notificationsService.createEventCreatedNotification(savedEvent);
+      } catch (notifyError) {
+        this.logger.error(
+          `Failed to create event created notification for event ${savedEvent.id}: ${notifyError.message}`,
+          notifyError.stack,
+        );
+        // Không throw để tránh làm fail luôn API tạo sự kiện
+      }
+
       return savedEvent;
     } catch (error) {
       this.logger.error(`Failed to create event: ${error.message}`, error.stack, { dto });
@@ -106,6 +119,17 @@ export class EventsService {
 
       // Cập nhật lại các job nhắc sự kiện khi thay đổi thời gian / trạng thái
       await this.eventJobsService.scheduleEventReminderJobs(updatedEvent);
+
+      // Tạo notification + hook để gọi API hệ thống khác khi chỉnh sửa sự kiện
+      try {
+        await this.notificationsService.createEventUpdatedNotification(updatedEvent);
+      } catch (notifyError) {
+        this.logger.error(
+          `Failed to create event updated notification for event ${updatedEvent.id}: ${notifyError.message}`,
+          notifyError.stack,
+        );
+        // Không throw để tránh làm fail luôn API cập nhật sự kiện
+      }
 
       return updatedEvent;
     } catch (error) {

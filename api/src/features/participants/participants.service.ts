@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { ILike, In, Repository } from 'typeorm';
 import { CreateParticipantDto } from './dto/create-participant.dto';
 import { UpdateParticipantDto } from './dto/update-participant.dto';
 import { Participant } from './entities/participant.entity';
@@ -134,6 +134,26 @@ export class ParticipantsService {
     });
   }
 
+  async findByIdentityNumbers(identityNumbers: string[]): Promise<Participant[]> {
+    if (!identityNumbers || identityNumbers.length === 0) {
+      return [];
+    }
+
+    const trimmed = identityNumbers
+      .map((v) => v?.toString().trim())
+      .filter((v) => !!v);
+
+    if (trimmed.length === 0) {
+      return [];
+    }
+
+    return this.participantsRepository.find({
+      where: {
+        identity_number: In(trimmed),
+      },
+    });
+  }
+
   async update(id: string, dto: UpdateParticipantDto): Promise<Participant> {
     this.logger.log(`Updating participant: ${id}`);
     
@@ -161,14 +181,104 @@ export class ParticipantsService {
     this.logger.log(`Participant deleted successfully: ${id}`);
   }
 
-  async importFromExcel(data: any[]): Promise<{ success: number; failed: number; errors: any[] }> {
-    this.logger.log(`Starting Excel import for participants with ${data.length} rows`);
+  /**
+   * Chuẩn hoá dữ liệu Excel về dạng object participant:
+   * { identity_number, full_name, email, phone, organization, position, is_receptionist }
+   *
+   * Hỗ trợ cả 2 dạng:
+   *  - Đã là dữ liệu chuẩn (đã có identity_number, full_name, ...)
+   *  - Dữ liệu đọc từ Excel có header tiếng Việt giống ví dụ jsonData của FE.
+   */
+  private normalizeExcelData(data: any[]): any[] {
+    if (!data || data.length === 0) {
+      return [];
+    }
+
+    const firstRow = data[0];
+    const headerValues = Object.values(firstRow || {}).map((v) => (v ?? '').toString().trim());
+
+    const looksLikeHeader =
+      headerValues.some((v) => /Số CCCD\/ID/i.test(v)) &&
+      headerValues.some((v) => /Họ và tên/i.test(v));
+
+    // Nếu không phải dạng header tiếng Việt, coi như data đã chuẩn rồi
+    if (!looksLikeHeader) {
+      return data;
+    }
+
+    // Map key trong JSON (Import danh sách khách mời, __EMPTY, __EMPTY_1, ...) -> field name
+    const keyToField: Record<string, keyof Omit<Participant, 'id' | 'created_at'>> = {};
+
+    for (const [key, rawHeader] of Object.entries(firstRow)) {
+      const header = (rawHeader ?? '').toString().trim();
+
+      if (/Số CCCD\/ID/i.test(header)) {
+        keyToField[key] = 'identity_number';
+      } else if (/Họ và tên/i.test(header)) {
+        keyToField[key] = 'full_name';
+      } else if (/Email/i.test(header)) {
+        keyToField[key] = 'email';
+      } else if (/Số điện thoại/i.test(header)) {
+        keyToField[key] = 'phone';
+      } else if (/Tổ chức/i.test(header)) {
+        keyToField[key] = 'organization';
+      } else if (/Chức vụ/i.test(header)) {
+        keyToField[key] = 'position';
+      } else if (/Cần đón tiếp\?/i.test(header)) {
+        keyToField[key] = 'is_receptionist';
+      }
+    }
+
+    const normalized: any[] = [];
+
+    // Bỏ qua hàng header (index 0), xử lý các hàng dữ liệu
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i] || {};
+      const out: any = {};
+
+      for (const [colKey, field] of Object.entries(keyToField)) {
+        const rawValue = (row as any)[colKey];
+        if (rawValue === undefined || rawValue === null) continue;
+
+        if (field === 'is_receptionist') {
+          const v = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+          out.is_receptionist =
+            v === 'X' ||
+            v === 'x' ||
+            v === true ||
+            v === 1 ||
+            v === 'true' ||
+            v === '1';
+        } else {
+          out[field] = typeof rawValue === 'string' ? rawValue.trim() : rawValue;
+        }
+      }
+
+      // Bỏ qua hàng trống hoàn toàn
+      if (!out.identity_number && !out.full_name) {
+        continue;
+      }
+
+      normalized.push(out);
+    }
+
+    return normalized;
+  }
+
+  async importFromExcel(
+    data: any[],
+  ): Promise<{ success: number; failed: number; errors: any[]; identity_numbers: string[] }> {
+    this.logger.log(`Starting Excel import for participants with ${data.length} raw rows`);
+
+    const normalizedData = this.normalizeExcelData(data);
+    this.logger.log(`Normalized Excel data into ${normalizedData.length} participant rows`);
     
     let success = 0;
     let failed = 0;
     const errors: any[] = [];
+    const identityNumbers: string[] = [];
 
-    for (const row of data) {
+    for (const row of normalizedData) {
       try {
         // Validate required fields
         if (!row.identity_number || !row.full_name) {
@@ -180,9 +290,12 @@ export class ParticipantsService {
           continue;
         }
 
+        // Chuẩn hoá identity_number dùng cho log + trả về
+        const identityNumber = String(row.identity_number).trim();
+
         // Check if participant already exists
         const existing = await this.participantsRepository.findOne({
-          where: { identity_number: row.identity_number },
+        where: { identity_number: identityNumber },
         });
 
         if (existing) {
@@ -194,7 +307,11 @@ export class ParticipantsService {
             phone: row.phone || null,
             organization: row.organization || null,
             position: row.position || null,
-            is_receptionist: row.is_receptionist === true || row.is_receptionist === 'true' || row.is_receptionist === 1 || false
+            is_receptionist:
+              row.is_receptionist === true ||
+              row.is_receptionist === 'true' ||
+              row.is_receptionist === 1 ||
+              false,
           });
           await this.participantsRepository.save(merged);
         } else {
@@ -203,18 +320,25 @@ export class ParticipantsService {
           this.logger.debug(`Creating new participant: ${row.full_name} (id: ${id})`);
           const entity = this.participantsRepository.create({
             id,
-            identity_number: row.identity_number,
+            identity_number: identityNumber,
             full_name: row.full_name,
             email: row.email || null,
             phone: row.phone || null,
             organization: row.organization || null,
             position: row.position || null,
-            is_receptionist: row.is_receptionist === true || row.is_receptionist === 'true' || row.is_receptionist === 1 || false
+            is_receptionist:
+              row.is_receptionist === true ||
+              row.is_receptionist === 'true' ||
+              row.is_receptionist === 1 ||
+              false,
           });
           await this.participantsRepository.save(entity);
         }
         
         success++;
+        if (identityNumber) {
+          identityNumbers.push(identityNumber);
+        }
       } catch (error) {
         failed++;
         this.logger.error(`Error importing participant row: ${error.message}`, error.stack, { row });
@@ -225,7 +349,9 @@ export class ParticipantsService {
       }
     }
 
-    this.logger.log(`Excel import completed: ${success} succeeded, ${failed} failed`);
-    return { success, failed, errors };
+    this.logger.log(
+      `Excel import completed: ${success} succeeded, ${failed} failed, ${identityNumbers.length} identity_numbers collected`,
+    );
+    return { success, failed, errors, identity_numbers: identityNumbers };
   }
 }

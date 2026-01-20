@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
-import { ParticipantsService } from '../participants/participants.service';
+import { ParticipantsService } from '../features/participants/participants.service';
 
 @Injectable()
 export class AuthService {

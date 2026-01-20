@@ -1,2 +1,1 @@
-export { NotificationReceiversModule } from '../../notification-receivers/notification-receivers.module';
-
+export { NotificationReceiversModule } from './notification-receivers.module';

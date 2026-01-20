@@ -1,10 +1,14 @@
-import { Injectable, Logger, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit, OnModuleDestroy, Inject, forwardRef } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import fetch from 'node-fetch';
 import { Event, EventStatus } from '../events/entities/event.entity';
 import { EventJob, EventJobStatus, EventJobType } from './entities/event-job.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationReceiversService } from '../notification-receivers/notification-receivers.service';
+import { EventParticipantsService } from '../event-participants/event-participants.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 
 @Injectable()
 export class EventJobsService implements OnModuleInit, OnModuleDestroy {
@@ -17,6 +21,12 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
     @InjectRepository(Event)
     private readonly eventsRepository: Repository<Event>,
     private readonly configService: ConfigService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => NotificationReceiversService))
+    private readonly notificationReceiversService: NotificationReceiversService,
+    @Inject(forwardRef(() => EventParticipantsService))
+    private readonly eventParticipantsService: EventParticipantsService,
   ) {}
 
   /**
@@ -124,23 +134,40 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
   async processDueJobs(): Promise<void> {
     const now = new Date();
 
-    const jobs = await this.jobsRepository.find({
-      where: {
-        status: EventJobStatus.PENDING,
-        run_at: LessThanOrEqual(now),
-      },
-      take: 50,
-      order: { run_at: 'ASC' },
-    });
+    try {
+      const jobs = await this.jobsRepository.find({
+        where: {
+          status: EventJobStatus.PENDING,
+          run_at: LessThanOrEqual(now),
+        },
+        take: 50,
+        order: { run_at: 'ASC' },
+      });
 
-    if (!jobs.length) {
-      return;
-    }
+      if (!jobs.length) {
+        return;
+      }
 
-    this.logger.log(`Found ${jobs.length} due event jobs to process`);
+      this.logger.log(`Found ${jobs.length} due event jobs to process`);
 
-    for (const job of jobs) {
-      await this.processSingleJob(job);
+      for (const job of jobs) {
+        await this.processSingleJob(job);
+      }
+    } catch (err: any) {
+      // Nếu bảng event_jobs chưa tồn tại (DB mới chưa được migrate), tránh spam lỗi
+      const message = err?.message || '';
+      const code = err?.code || err?.driverError?.code;
+
+      if (code === '42P01' || /relation ["']?event_jobs["']? does not exist/i.test(message)) {
+        this.logger.warn(
+          'Skip processing event jobs because table "event_jobs" does not exist yet. ' +
+            'Run migrations to create schema before using the scheduler.',
+        );
+        return;
+      }
+
+      this.logger.error('processDueJobs unexpected error', err?.stack || err);
+      throw err;
     }
   }
 
@@ -196,15 +223,74 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
       return;
     }
 
+    // Tạo notification với message phù hợp
+    let notificationMessage = '';
+    let notificationTitle = '';
+
+    const startTime = new Date(event.start_time);
+    const formattedDate = this.formatVietnameseDate(startTime);
+    const formattedTime = this.formatVietnameseTime(startTime);
+
+    switch (job.type) {
+      case EventJobType.REMIND_BEFORE_1_DAY:
+        notificationMessage = `Sự kiện ${event.name} được tổ chức vào ${formattedDate} lúc ${formattedTime}, vui lòng chú ý`;
+        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        break;
+      case EventJobType.REMIND_BEFORE_4_HOURS:
+        notificationMessage = `Sự kiện ${event.name} được tổ chức vào 4 giờ nữa, vui lòng chú ý`;
+        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        break;
+      case EventJobType.REMIND_BEFORE_1_HOUR:
+        notificationMessage = `Sự kiện ${event.name} sẽ diễn sau 1 giờ nữa, vui lòng chú ý`;
+        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        break;
+    }
+
+    // Tạo notification trong database
+    let notification;
+    try {
+      notification = await this.notificationsService.create({
+        event_id: event.id,
+        title: notificationTitle,
+        message: notificationMessage,
+        type: NotificationType.REMINDER,
+        scheduled_time: job.run_at,
+      });
+
+      // Lấy danh sách participants của event và tạo notification receivers
+      const eventParticipants = await this.eventParticipantsService.findByEventId(event.id);
+      for (const ep of eventParticipants) {
+        await this.notificationReceiversService.create({
+          notification_id: notification.id,
+          participant_id: ep.participant_id,
+        });
+      }
+
+      this.logger.log(
+        `Created notification ${notification.id} for event ${event.id} with ${eventParticipants.length} receivers`,
+      );
+    } catch (error: any) {
+      this.logger.error(
+        `Failed to create notification for job ${job.id}: ${error.message}`,
+        error.stack,
+      );
+      // Tiếp tục xử lý job dù có lỗi tạo notification
+    }
+
     const body =
       job.payload || ({
         eventId: job.event_id,
         jobId: job.id,
         type: job.type,
         runAt: job.run_at.toISOString(),
+        notificationId: notification?.id,
+        message: notificationMessage,
       } as any);
 
     try {
+      // TODO: Gọi API hệ thống khác tại đây để gửi thông báo đến danh sách khách mời
+      // Ví dụ: await this.sendNotificationToExternalSystem(event, notificationMessage, eventParticipants);
+
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -237,6 +323,25 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
       job.last_error = error?.message || 'Unknown error';
       await this.jobsRepository.save(job);
     }
+  }
+
+  /**
+   * Format ngày theo định dạng tiếng Việt: ngày/tháng/năm
+   */
+  private formatVietnameseDate(date: Date): string {
+    const day = date.getDate().toString().padStart(2, '0');
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+  }
+
+  /**
+   * Format giờ theo định dạng tiếng Việt: xx giờ xx phút
+   */
+  private formatVietnameseTime(date: Date): string {
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours} giờ ${minutes} phút`;
   }
 }
 

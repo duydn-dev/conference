@@ -1,2 +1,1 @@
-export { OrganizerUnitsModule } from '../../organizer-units/organizer-units.module';
-
+export { OrganizerUnitsModule } from './organizer-units.module';

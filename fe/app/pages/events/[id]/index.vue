@@ -29,7 +29,7 @@
           <div class="relative h-64 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500">
             <div v-if="event.avatar" class="absolute inset-0">
               <img 
-                :src="event.avatar" 
+                :src="getFullUrl(event.avatar)" 
                 :alt="event.name"
                 class="w-full h-full object-cover"
               />
@@ -194,6 +194,7 @@
               :zoom="15"
               height="100%"
               :marker="mapMarker"
+              :initial-location="initialMapLocation"
             />
           </div>
         </div>
@@ -307,6 +308,20 @@ const mapMarker = computed(() => {
     },
     title: event.value?.location_name || event.value?.name || 'Vị trí sự kiện'
   }
+})
+
+const initialMapLocation = computed(() => {
+  // Nếu có location hoặc location_name thì truyền vào initialLocation để không tự động geolocate
+  if (event.value?.location || event.value?.location_name) {
+    if (mapCenter.value) {
+      return {
+        address: event.value?.location_name || event.value?.name || 'Vị trí sự kiện',
+        lat: mapCenter.value[1],
+        lng: mapCenter.value[0]
+      }
+    }
+  }
+  return null
 })
 
 const getStatusSeverity = (status: EventStatus | number) => {

@@ -3,7 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
-import { Notification } from './entities/notification.entity';
+import { Notification, NotificationType } from './entities/notification.entity';
+import { Event } from '../events/entities/event.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -118,5 +119,55 @@ export class NotificationsService {
     }
 
     this.logger.log(`Notification deleted successfully: ${id}`);
+  }
+
+  /**
+   * Tạo notification khi thêm mới sự kiện.
+   * Đồng thời là nơi bạn sẽ gọi sang API hệ thống khác để gửi thông báo cho danh sách khách mời.
+   *
+   * TODO: implement external notification API call (gửi tới danh sách khách mời)
+   */
+  async createEventCreatedNotification(event: Event): Promise<Notification> {
+    const organizerName = event.organizerUnit?.name || 'Đơn vị tổ chức';
+
+    const start = event.start_time instanceof Date ? event.start_time : new Date(event.start_time);
+    const dateStr = start.toLocaleDateString('vi-VN');
+    const timeStr = start.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    });
+
+    const message = `${organizerName} đã mời bạn tham gia sự kiện ${event.name} vào ngày ${dateStr} lúc ${timeStr}, hãy kiểm tra`;
+
+    // TODO: Gọi API hệ thống khác tại đây (gửi message + danh sách khách mời)
+
+    return this.create({
+      event_id: event.id,
+      title: `Mời tham gia sự kiện ${event.name}`,
+      message,
+      type: NotificationType.REMINDER,
+    });
+  }
+
+  /**
+   * Tạo notification khi chỉnh sửa sự kiện.
+   * Đồng thời là nơi bạn sẽ gọi sang API hệ thống khác để gửi thông báo cho danh sách khách mời.
+   *
+   * TODO: implement external notification API call (gửi tới danh sách khách mời)
+   */
+  async createEventUpdatedNotification(event: Event): Promise<Notification> {
+    const organizerName = event.organizerUnit?.name || 'Đơn vị tổ chức';
+
+    const message = `${organizerName} đã thay đổi thông tin sự kiện ${event.name}, hãy kiểm tra thông tin`;
+
+    // TODO: Gọi API hệ thống khác tại đây (gửi message + danh sách khách mời)
+
+    return this.create({
+      event_id: event.id,
+      title: `Thay đổi thông tin sự kiện ${event.name}`,
+      message,
+      type: NotificationType.CHANGE,
+    });
   }
 }
