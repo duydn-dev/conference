@@ -10,5 +10,6 @@ import { NotificationsModule } from '../notifications/notifications.module';
   imports: [TypeOrmModule.forFeature([Event]), EventJobsModule, NotificationsModule],
   controllers: [EventsController],
   providers: [EventsService],
+  exports: [EventsService],
 })
 export class EventsModule {}

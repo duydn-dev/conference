@@ -111,9 +111,6 @@
             </div>
           </div>
 
-          <button class="p-2 hover:bg-gray-100 rounded-lg transition-colors">
-            <i class="pi pi-cog text-gray-600"></i>
-          </button>
           <div class="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center">
             <i class="pi pi-user text-sky-600 text-sm"></i>
           </div>

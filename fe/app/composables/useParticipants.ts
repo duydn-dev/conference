@@ -17,13 +17,13 @@ export const useParticipants = () => {
     if (options?.identity_number) query.identity_number = options.identity_number
     if (options?.search) query.search = options.search
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/participants', { baseURL, query })
+    return await $fetch('/participants', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/participants/${id}`, { baseURL, query })
+    return await $fetch(`/participants/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateParticipantDto) => {

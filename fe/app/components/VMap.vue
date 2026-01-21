@@ -3,7 +3,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
+import { ref, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue'
 
 // Type definitions for VTMap
 declare global {
@@ -39,7 +39,8 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const map = ref<any>(null)
-const mapId = ref(props.mapId || `vtmap-${Date.now()}`)
+// Generate unique mapId if not provided (once per component instance)
+const mapId = ref(props.mapId || `vtmap-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
 const mapLoaded = ref(false)
 
 const emit = defineEmits<{
@@ -47,6 +48,7 @@ const emit = defineEmits<{
   'map-loaded': [map: any]
   'map-error': [error: any]
   'map-selected': [location: { address: string; lat: number; lng: number }]
+  'location-found': [location: { lat: number; lng: number }]
 }>()
 
 const loadScript = (): Promise<void> => {
@@ -122,6 +124,12 @@ const getMapStyle = () => {
 
 // Khởi tạo map instance
 const createMapInstance = () => {
+  // Verify container exists before creating map
+  const container = document.getElementById(mapId.value)
+  if (!container) {
+    throw new Error(`Container '${mapId.value}' not found. Make sure the DOM element exists.`)
+  }
+
   const mapStyle = getMapStyle()
   return new window.vtmapgl.Map({
     container: mapId.value,
@@ -133,6 +141,7 @@ const createMapInstance = () => {
 
 // Thêm control định vị vị trí
 const geolocateControlRef = ref<any>(null)
+const geolocateCompleted = ref(false)
 const addGeolocateControl = () => {
   const geolocateControl = new window.vtmapgl.GeolocateControl({
     positionOptions: {
@@ -140,6 +149,73 @@ const addGeolocateControl = () => {
     },
     trackUserLocation: true
   })
+  
+  // Lắng nghe event khi geolocate hoàn tất
+  geolocateControl.on('geolocate', (e: any) => {
+    geolocateCompleted.value = true
+    // Lấy tọa độ từ event nếu có
+    if (e?.coords) {
+      const lat = e.coords.latitude
+      const lng = e.coords.longitude
+      emit('location-found', { lat, lng })
+    } else if (map.value) {
+      // Nếu không có trong event, lấy từ map center (map đã tự động di chuyển đến vị trí)
+      setTimeout(() => {
+        const center = map.value.getCenter()
+        if (center) {
+          const lat = center.lat
+          const lng = center.lng
+          emit('location-found', { lat, lng })
+        }
+      }, 100)
+    }
+    // Nếu có initialLocation, sau khi geolocate xong thì thêm marker (Step 2)
+    if (props.initialLocation) {
+      setTimeout(() => {
+        applyInitialLocation()
+      }, 500)
+    }
+  })
+  
+  // Lắng nghe event khi geolocate error hoặc user location updated
+  geolocateControl.on('error', (e: any) => {
+    geolocateCompleted.value = true
+    console.error('Geolocate error:', e)
+    // Nếu có initialLocation và geolocate lỗi, vẫn thêm marker (Step 2)
+    if (props.initialLocation) {
+      setTimeout(() => {
+        applyInitialLocation()
+      }, 500)
+    }
+  })
+
+  // Event locationfound - khi VTMap tìm thấy vị trí (Mapbox/VTMap specific event)
+  geolocateControl.on('locationfound', (e: any) => {
+    geolocateCompleted.value = true
+    // Lấy tọa độ từ event hoặc từ map center
+    if (e?.lngLat) {
+      const lat = e.lngLat.lat
+      const lng = e.lngLat.lng
+      emit('location-found', { lat, lng })
+    } else if (map.value) {
+      // Fallback: lấy từ map center sau khi geolocate
+      setTimeout(() => {
+        const center = map.value.getCenter()
+        if (center) {
+          const lat = center.lat
+          const lng = center.lng
+          emit('location-found', { lat, lng })
+        }
+      }, 100)
+    }
+    // Nếu có initialLocation, sau khi location found thì thêm marker (Step 2)
+    if (props.initialLocation) {
+      setTimeout(() => {
+        applyInitialLocation()
+      }, 500)
+    }
+  })
+  
   map.value.addControl(geolocateControl)
   geolocateControlRef.value = geolocateControl
 }
@@ -252,16 +328,25 @@ const setupMapLoadHandler = () => {
   map.value.on('load', () => {
     mapLoaded.value = true
     emit('map-loaded', map.value)
-    // Áp dụng vị trí khởi tạo nếu có
-    applyInitialLocation()
     
-    // Chỉ tự động trigger nút "Find my location" nếu không có initialLocation
-    // (để tránh override vị trí đã được truyền vào)
-    if (!props.initialLocation) {
-      setTimeout(() => {
-        triggerGeolocateButton()
-      }, 500)
-    }
+    // Reset geolocate completed flag
+    geolocateCompleted.value = false
+    
+    // Luôn trigger nút "Find my location" trước (Step 1)
+    setTimeout(() => {
+      triggerGeolocateButton()
+      
+      // Nếu có initialLocation, đợi geolocate xong rồi mới thêm marker (Step 2)
+      // Nếu không có geolocate event trong 3 giây, vẫn thêm marker
+      if (props.initialLocation) {
+        setTimeout(() => {
+          if (!geolocateCompleted.value) {
+            geolocateCompleted.value = true
+            applyInitialLocation()
+          }
+        }, 3000)
+      }
+    }, 500)
   })
 }
 
@@ -282,6 +367,17 @@ const triggerGeolocateButton = () => {
 // Hàm chính khởi tạo map
 const initMap = () => {
   if (!window.vtmapgl || mapLoaded.value) {
+    return
+  }
+
+  // Verify container exists
+  const container = document.getElementById(mapId.value)
+  if (!container) {
+    console.warn(`Container '${mapId.value}' not found yet, retrying...`)
+    // Retry after a short delay
+    setTimeout(() => {
+      initMap()
+    }, 100)
     return
   }
 
@@ -340,10 +436,12 @@ watch(() => props.zoom, (newZoom) => {
 onMounted(async () => {
   try {
     await loadScript()
-    // Wait a bit for script to initialize
+    // Wait for DOM to be fully rendered and script to initialize
+    // Use nextTick to ensure the template has rendered
+    await nextTick()
     setTimeout(() => {
       initMap()
-    }, 100)
+    }, 200)
   } catch (error) {
     console.error('Error loading VTMap SDK:', error)
     emit('map-error', error)

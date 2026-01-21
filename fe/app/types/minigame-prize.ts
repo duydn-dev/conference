@@ -4,6 +4,8 @@ export interface MinigamePrize {
   minigame_id: string
   prize_name: string
   quantity: number
+  description?: string | null
+  image?: string | null
   remaining_quantity?: number
   created_at?: string
 }
@@ -13,6 +15,8 @@ export interface CreateMinigamePrizeDto {
   minigame_id: string
   prize_name: string
   quantity: number
+  description?: string
+  image?: string
   remaining_quantity?: number
 }
 

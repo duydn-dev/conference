@@ -16,6 +16,7 @@ import { MinigameResultsModule } from './features/minigame-results';
 import { ImportLogsModule } from './features/import-logs';
 import { UploadModule } from './features/upload';
 import { EventJobsModule } from './features/event-jobs';
+import { DashboardModule } from './features/dashboard/dashboard.module';
 import { AuthModule } from './auth/auth.module';
 import { LoggerModule } from './common/logger/logger.module';
 
@@ -56,6 +57,7 @@ import { LoggerModule } from './common/logger/logger.module';
     UploadModule,
     AuthModule,
     EventJobsModule,
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [AppService],

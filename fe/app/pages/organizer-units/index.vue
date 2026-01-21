@@ -16,7 +16,7 @@
 
     <!-- Search and Filters -->
     <div class="flex flex-col md:flex-row gap-4">
-      <div class="flex-1 max-w-md">
+      <div class="w-full md:max-w-[250px]">
         <IconField>
           <InputIcon class="pi pi-search" />
           <InputText 

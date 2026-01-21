@@ -34,6 +34,11 @@ export class EventParticipantsController {
     return this.eventParticipantsService.update(id, updateEventParticipantDto);
   }
 
+  @Patch(':id/checkin')
+  checkIn(@Param('id') id: string) {
+    return this.eventParticipantsService.checkIn(id);
+  }
+
   @Delete(':id')
   remove(@Param('id') id: string) {
     return this.eventParticipantsService.remove(id);

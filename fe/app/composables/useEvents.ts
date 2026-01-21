@@ -17,17 +17,17 @@ export const useEvents = () => {
     if (options?.status) query.status = options.status
     if (options?.search) query.search = options.search
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/events', { baseURL, query })
+    return await $fetch('/events', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/events/${id}`, { baseURL, query })
+    return await $fetch(`/events/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateEventDto) => {
-    return await useFetch('/events', {
+    return await $fetch('/events', {
       method: 'POST',
       body: data,
       baseURL
@@ -35,7 +35,7 @@ export const useEvents = () => {
   }
 
   const update = async (id: string, data: Partial<UpdateEventDto>) => {
-    return await useFetch(`/events/${id}`, {
+    return await $fetch(`/events/${id}`, {
       method: 'PUT',
       body: data,
       baseURL
@@ -43,7 +43,7 @@ export const useEvents = () => {
   }
 
   const remove = async (id: string) => {
-    return await useFetch(`/events/${id}`, {
+    return await $fetch(`/events/${id}`, {
       method: 'DELETE',
       baseURL
     })

@@ -17,11 +17,13 @@ export interface Minigame {
   id: string
   event_id: string
   name: string
+  type: string
   description?: string
   config?: any
   start_time?: string | Date
   end_time?: string | Date
   status: MinigameStatus
+  event?: any
   created_at?: string
   updated_at?: string
 }
@@ -30,6 +32,7 @@ export interface Minigame {
 export interface CreateMinigameDto {
   event_id: string
   name: string
+  type: string
   description?: string
   config?: any
   start_time?: string | Date

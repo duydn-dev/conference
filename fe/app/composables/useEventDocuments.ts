@@ -15,13 +15,13 @@ export const useEventDocuments = () => {
     if (options?.limit) query.limit = options.limit
     if (options?.event_id) query.event_id = options.event_id
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/event-documents', { baseURL, query })
+    return await $fetch('/event-documents', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/event-documents/${id}`, { baseURL, query })
+    return await $fetch(`/event-documents/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateEventDocumentDto) => {

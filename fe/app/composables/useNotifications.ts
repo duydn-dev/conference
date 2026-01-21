@@ -17,13 +17,13 @@ export const useNotifications = () => {
     if (options?.event_id) query.event_id = options.event_id
     if (options?.type !== undefined) query.type = options.type
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/notifications', { baseURL, query })
+    return await $fetch('/notifications', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/notifications/${id}`, { baseURL, query })
+    return await $fetch(`/notifications/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateNotificationDto) => {

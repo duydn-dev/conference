@@ -224,13 +224,14 @@
                 />
               </div>
               
-              <DataTable 
-                :value="selectedParticipants" 
-                :rows="10"
-                :paginator="selectedParticipants.length > 10"
-                class="border border-gray-200 rounded-lg"
-                :emptyMessage="'Chưa có khách mời'"
-              >
+              <div class="overflow-x-auto">
+                <DataTable 
+                  :value="selectedParticipants" 
+                  :rows="10"
+                  :paginator="selectedParticipants.length > 10"
+                  class="border border-gray-200 rounded-lg mobile-table"
+                  :emptyMessage="'Chưa có khách mời'"
+                >
                 <Column field="full_name" header="Họ tên" />
                 <Column field="identity_number" header="CMND/CCCD" />
                 <Column field="email" header="Email" />
@@ -248,6 +249,7 @@
                   </template>
                 </Column>
               </DataTable>
+              </div>
             </div>
           </div>
         </div>
@@ -699,3 +701,12 @@ onMounted(async () => {
 })
 </script>
 
+<style scoped>
+/* Mobile table styles */
+@media (max-width: 768px) {
+  :deep(.mobile-table .p-datatable-tbody > tr > td),
+  :deep(.mobile-table .p-datatable-thead > tr > th) {
+    white-space: nowrap;
+  }
+}
+</style>

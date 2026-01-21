@@ -19,17 +19,17 @@ export const useEventParticipants = () => {
     if (options?.participant_id) query.participant_id = options.participant_id
     if (options?.status !== undefined) query.status = options.status
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/event-participants', { baseURL, query })
+    return await $fetch('/event-participants', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/event-participants/${id}`, { baseURL, query })
+    return await $fetch(`/event-participants/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateEventParticipantDto) => {
-    return await useFetch('/event-participants', {
+    return await $fetch('/event-participants', {
       method: 'POST',
       body: data,
       baseURL
@@ -37,16 +37,23 @@ export const useEventParticipants = () => {
   }
 
   const update = async (id: string, data: Partial<UpdateEventParticipantDto>) => {
-    return await useFetch(`/event-participants/${id}`, {
-      method: 'PUT',
+    return await $fetch(`/event-participants/${id}`, {
+      method: 'PATCH',
       body: data,
       baseURL
     })
   }
 
   const remove = async (id: string) => {
-    return await useFetch(`/event-participants/${id}`, {
+    return await $fetch(`/event-participants/${id}`, {
       method: 'DELETE',
+      baseURL
+    })
+  }
+
+  const checkIn = async (id: string) => {
+    return await $fetch(`/event-participants/${id}/checkin`, {
+      method: 'PATCH',
       baseURL
     })
   }
@@ -56,6 +63,7 @@ export const useEventParticipants = () => {
     getById,
     create,
     update,
-    remove
+    remove,
+    checkIn
   }
 }

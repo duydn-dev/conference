@@ -56,28 +56,36 @@
     </div>
 
     <!-- Large Chart Section -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div class="mb-6 flex items-center gap-2">
-        <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
-        <h2 class="text-lg font-semibold text-gray-800">Sự kiện được tạo theo tháng</h2>
-      </div>
-      <ClientOnly>
-        <apexchart
-          type="bar"
-          :options="eventsMonthlyOptions"
-          :series="eventsMonthlySeries"
-          height="350"
-        />
-      </ClientOnly>
-    </div>
+    <Card class="w-full">
+      <template #title>
+        <div class="flex items-center gap-2">
+          <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
+          <span>Sự kiện được tạo theo tháng</span>
+        </div>
+      </template>
+      <template #content>
+        <div class="w-full">
+          <ClientOnly>
+            <apexchart
+              type="bar"
+              :options="eventsMonthlyOptions"
+              :series="eventsMonthlySeries"
+              height="350"
+              width="100%"
+            />
+          </ClientOnly>
+        </div>
+      </template>
+    </Card>
 
     <!-- Recent Events Table - Full Width -->
-    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <!-- <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div class="mb-6 flex items-center gap-2">
         <i class="pi pi-list text-sky-600 text-lg"></i>
         <h2 class="text-lg font-semibold text-gray-800">Sự kiện gần đây</h2>
       </div>
-      <DataTable :value="recentEvents" :paginator="true" :rows="5" class="p-datatable-sm" :stripedRows="true">
+      <div>
+        <DataTable :value="recentEvents" :paginator="true" :rows="5" class="p-datatable-sm mobile-table" :stripedRows="true">
         <Column field="code" sortable>
           <template #header>
             <div class="flex items-center gap-2">
@@ -136,65 +144,80 @@
         </Column>
       </DataTable>
     </div>
+    </div> -->
 
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Events by Status Chart -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="mb-6 flex items-center gap-2">
-          <i class="pi pi-chart-pie text-sky-600 text-lg"></i>
-          <h2 class="text-lg font-semibold text-gray-800">Sự kiện theo trạng thái</h2>
-        </div>
-        <ClientOnly>
-          <apexchart
-            type="donut"
-            :options="eventsByStatusOptions"
-            :series="eventsByStatusSeries"
-            height="300"
-          />
-        </ClientOnly>
-      </div>
+      <Card class="w-full">
+        <template #title>
+          <div class="flex items-center gap-2">
+            <i class="pi pi-chart-pie text-sky-600 text-lg"></i>
+            <span>Sự kiện theo trạng thái</span>
+          </div>
+        </template>
+        <template #content>
+          <ClientOnly>
+            <apexchart
+              type="donut"
+              :options="eventsByStatusOptions"
+              :series="eventsByStatusSeries"
+              height="350"
+              width="100%"
+            />
+          </ClientOnly>
+        </template>
+      </Card>
       
       <!-- Participants Over Time -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="mb-6 flex items-center gap-2">
-          <i class="pi pi-chart-line text-sky-600 text-lg"></i>
-          <h2 class="text-lg font-semibold text-gray-800">Người tham gia theo thời gian</h2>
-        </div>
-        <ClientOnly>
-          <apexchart
-            type="area"
-            :options="participantsOverTimeOptions"
-            :series="participantsOverTimeSeries"
-            height="300"
-          />
-        </ClientOnly>
-      </div>
+      <Card class="w-full">
+        <template #title>
+          <div class="flex items-center gap-2">
+            <i class="pi pi-chart-line text-sky-600 text-lg"></i>
+            <span>Người tham gia theo thời gian</span>
+          </div>
+        </template>
+        <template #content>
+          <ClientOnly>
+            <apexchart
+              type="area"
+              :options="participantsOverTimeOptions"
+              :series="participantsOverTimeSeries"
+              width="100%"
+            />
+          </ClientOnly>
+        </template>
+      </Card>
 
       <!-- Top Organizer Units -->
-      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-        <div class="mb-6 flex items-center gap-2">
-          <i class="pi pi-trophy text-sky-600 text-lg"></i>
-          <h2 class="text-lg font-semibold text-gray-800">Đơn vị tổ chức hàng đầu</h2>
-        </div>
-        <ClientOnly>
-          <apexchart
-            type="bar"
-            :options="topOrganizersOptions"
-            :series="topOrganizersSeries"
-            height="300"
-          />
-        </ClientOnly>
-      </div>
+      <Card class="w-full">
+        <template #title>
+          <div class="flex items-center gap-2">
+            <i class="pi pi-trophy text-sky-600 text-lg"></i>
+            <span>Đơn vị tổ chức hàng đầu</span>
+          </div>
+        </template>
+        <template #content>
+          <ClientOnly>
+            <apexchart
+              type="bar"
+              :options="topOrganizersOptions"
+              :series="topOrganizersSeries"
+              height="350"
+              width="100%"
+            />
+          </ClientOnly>
+        </template>
+      </Card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useEvents } from '~/composables/useEvents'
-import { useParticipants } from '~/composables/useParticipants'
+import { useDashboard } from '~/composables/useDashboard'
 import { formatDateLong } from '~/utils/helpers'
+import { EventStatus, EventStatusLabels } from '~/types/event'
 
 useHead({
   title: 'Trang chủ'
@@ -215,6 +238,7 @@ const recentEvents = ref([])
 const eventsByStatusOptions = ref({
   chart: {
     type: 'donut',
+    width: '100%',
   },
   labels: ['Bản nháp', 'Đã diễn ra', 'Đã đóng', 'Đã hủy'],
   colors: ['#bae6fd', '#0ea5e9', '#0284c7', '#0369a1'],
@@ -229,10 +253,20 @@ const eventsByStatusOptions = ref({
     }
   },
   responsive: [{
+    breakpoint: 768,
+    options: {
+      chart: {
+        width: '100%'
+      },
+      legend: {
+        position: 'bottom'
+      }
+    }
+  }, {
     breakpoint: 480,
     options: {
       chart: {
-        width: 200
+        width: '100%'
       },
       legend: {
         position: 'bottom'
@@ -247,6 +281,7 @@ const eventsByStatusSeries = ref([0, 0, 0, 0])
 const participantsOverTimeOptions = ref({
   chart: {
     type: 'area',
+    width: '100%',
     toolbar: {
       show: false
     }
@@ -282,7 +317,22 @@ const participantsOverTimeOptions = ref({
   grid: {
     borderColor: '#f1f5f9',
     strokeDashArray: 4
-  }
+  },
+  responsive: [{
+    breakpoint: 768,
+    options: {
+      chart: {
+        width: '100%'
+      }
+    }
+  }, {
+    breakpoint: 480,
+    options: {
+      chart: {
+        width: '100%'
+      }
+    }
+  }]
 })
 
 const participantsOverTimeSeries = ref([{
@@ -294,6 +344,8 @@ const participantsOverTimeSeries = ref([{
 const eventsMonthlyOptions = ref({
   chart: {
     type: 'bar',
+    height: '300',
+    width: '100%',
     toolbar: {
       show: false
     },
@@ -336,7 +388,46 @@ const eventsMonthlyOptions = ref({
   legend: {
     position: 'top',
     horizontalAlign: 'right'
-  }
+  },
+  responsive: [{
+    breakpoint: 768,
+    options: {
+      chart: {
+        width: '100%'
+      },
+      legend: {
+        position: 'bottom',
+        horizontalAlign: 'center'
+      },
+      plotOptions: {
+        bar: {
+          columnWidth: '50%'
+        }
+      }
+    }
+  }, {
+    breakpoint: 480,
+    options: {
+      chart: {
+        width: '100%'
+      },
+      legend: {
+        position: 'bottom',
+        horizontalAlign: 'center'
+      },
+      plotOptions: {
+        bar: {
+          columnWidth: '40%'
+        }
+      },
+      xaxis: {
+        labels: {
+          rotate: -45,
+          rotateAlways: true
+        }
+      }
+    }
+  }]
 })
 
 const eventsMonthlySeries = ref([{
@@ -348,6 +439,7 @@ const eventsMonthlySeries = ref([{
 const topOrganizersOptions = ref({
   chart: {
     type: 'bar',
+    width: '100%',
     toolbar: {
       show: false
     }
@@ -389,7 +481,22 @@ const topOrganizersOptions = ref({
   grid: {
     borderColor: '#f1f5f9',
     strokeDashArray: 4
-  }
+  },
+  responsive: [{
+    breakpoint: 768,
+    options: {
+      chart: {
+        width: '100%'
+      }
+    }
+  }, {
+    breakpoint: 480,
+    options: {
+      chart: {
+        width: '100%'
+      }
+    }
+  }]
 })
 
 const topOrganizersSeries = ref([{
@@ -397,206 +504,75 @@ const topOrganizersSeries = ref([{
   data: [] as number[]
 }])
 
-const { getPagination } = useEvents()
-const { getPagination: getParticipantsPagination } = useParticipants()
+const { 
+  getStats, 
+  getEventsByStatus, 
+  getEventsMonthly, 
+  getParticipantsOverTime, 
+  getTopOrganizers, 
+  getRecentEvents 
+} = useDashboard()
 
-
-const getStatusSeverity = (status: string) => {
-  const severityMap: Record<string, string> = {
-    draft: 'secondary',
-    published: 'success',
-    closed: 'info',
-    cancelled: 'danger'
+const getStatusSeverity = (status: EventStatus | number) => {
+  const map: Record<number, string> = {
+    [EventStatus.DRAFT]: 'secondary',
+    [EventStatus.PUBLISHED]: 'success',
+    [EventStatus.CLOSED]: 'info',
+    [EventStatus.CANCELLED]: 'danger'
   }
-  return severityMap[status] || 'secondary'
+  return map[Number(status)] || 'secondary'
 }
 
-const getStatusLabel = (status: string) => {
-  const labelMap: Record<string, string> = {
-    draft: 'Bản nháp',
-    published: 'Đã diễn ra',
-    closed: 'Đã đóng',
-    cancelled: 'Đã hủy'
-  }
-  return labelMap[status] || status
-}
-
-const loadFakeData = () => {
-  // Fake stats
-  stats.value = {
-    totalEvents: 247,
-    totalParticipants: 5823,
-    activeEvents: 18,
-    organizerUnits: 12
-  }
-
-  // Fake recent events
-  const eventNames = [
-    'Hội thảo Công nghệ Thông tin 2024',
-    'Workshop Marketing Digital',
-    'Hội nghị Khoa học Công nghệ',
-    'Seminar Quản lý Dự án',
-    'Triển lãm Thương mại Quốc tế',
-    'Hội thảo Khởi nghiệp',
-    'Chuỗi đào tạo Kỹ năng Mềm',
-    'Gala Doanh nghiệp',
-    'Hội nghị Y tế Cộng đồng',
-    'Workshop Thiết kế Đồ họa'
-  ]
-  
-  const statuses = ['draft', 'published', 'closed', 'cancelled']
-  const fakeRecentEvents = []
-  for (let i = 0; i < 10; i++) {
-    const daysAgo = i * 3
-    const date = new Date()
-    date.setDate(date.getDate() - daysAgo)
-    fakeRecentEvents.push({
-      code: `EVT${String(1000 + i).padStart(4, '0')}`,
-      name: eventNames[i] || `Sự kiện ${i + 1}`,
-      start_time: date.toISOString(),
-      status: statuses[i % 4]
-    })
-  }
-  recentEvents.value = fakeRecentEvents
-
-  // Fake events by status
-  eventsByStatusSeries.value = [45, 127, 58, 17]
-
-  // Fake events monthly (last 6 months)
-  const now = new Date()
-  const months: string[] = []
-  const monthlyCounts: number[] = []
-  const fakeMonthlyData = [32, 28, 45, 38, 52, 47] // Fake numbers cho 6 tháng
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-    months.push(date.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }))
-    monthlyCounts.push(fakeMonthlyData[5 - i])
-  }
-  eventsMonthlyOptions.value.xaxis.categories = months as any
-  eventsMonthlySeries.value = [{
-    name: 'Sự kiện',
-    data: monthlyCounts
-  }]
-
-  // Fake participants over time (last 7 days)
-  const days: string[] = []
-  const dailyCounts: number[] = []
-  const fakeDailyParticipants = [342, 456, 289, 523, 678, 412, 589] // Fake numbers cho 7 ngày
-  for (let i = 6; i >= 0; i--) {
-    const date = new Date()
-    date.setDate(date.getDate() - i)
-    days.push(date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }))
-    dailyCounts.push(fakeDailyParticipants[6 - i])
-  }
-  participantsOverTimeOptions.value.xaxis.categories = days as any
-  participantsOverTimeSeries.value = [{
-    name: 'Người tham gia',
-    data: dailyCounts
-  }]
-
-  // Fake top organizers
-  const organizerNames = [
-    'Phòng KHCN',
-    'Ban Tổ chức',
-    'Trung tâm Đào tạo',
-    'Hiệp hội Doanh nghiệp',
-    'Sở Kế hoạch Đầu tư'
-  ]
-  const organizerCounts = [42, 38, 35, 28, 22]
-  topOrganizersOptions.value.xaxis.categories = organizerNames as any
-  topOrganizersSeries.value = [{
-    name: 'Sự kiện',
-    data: organizerCounts
-  }]
+const getStatusLabel = (status: EventStatus | number) => {
+  return EventStatusLabels[status as EventStatus] || 'Không xác định'
 }
 
 const loadDashboardData = async () => {
-  // Load fake data immediately for beautiful display
-  loadFakeData()
-  
   try {
-    // Try to load real data from API (optional)
-    // Load events
-    const eventsResponse = await getPagination({ page: 1, limit: 100 })
-    const events = (eventsResponse.data.value as any)?.data || []
-    
-    // Only update if we have real data
-    if (events.length > 0) {
-      // Calculate stats
-      stats.value.totalEvents = events.length
-      stats.value.activeEvents = events.filter((e: any) => e.status === 'published').length
-      
-      // Events by status
-      const statusCounts = {
-        draft: 0,
-        published: 0,
-        closed: 0,
-        cancelled: 0
+    // Load stats
+    const statsData = await getStats() as any
+    if (statsData) {
+      stats.value = {
+        totalEvents: statsData.totalEvents || 0,
+        totalParticipants: statsData.totalParticipants || 0,
+        activeEvents: statsData.activeEvents || 0,
+        organizerUnits: statsData.organizerUnits || 0
       }
-      events.forEach((event: any) => {
-        if (statusCounts[event.status as keyof typeof statusCounts] !== undefined) {
-          statusCounts[event.status as keyof typeof statusCounts]++
-        }
-      })
-      eventsByStatusSeries.value = [
-        statusCounts.draft,
-        statusCounts.published,
-        statusCounts.closed,
-        statusCounts.cancelled
-      ]
-      
-      // Recent events
-      recentEvents.value = events.slice(0, 10)
-      
-      // Events monthly (last 6 months)
-      const now = new Date()
-      const months: string[] = []
-      const monthlyCounts: number[] = []
-      for (let i = 5; i >= 0; i--) {
-        const date = new Date(now.getFullYear(), now.getMonth() - i, 1)
-        months.push(date.toLocaleDateString('vi-VN', { month: 'short', year: 'numeric' }))
-        const monthStart = new Date(date.getFullYear(), date.getMonth(), 1)
-        const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0)
-        const count = events.filter((e: any) => {
-          const created = new Date(e.created_at)
-          return created >= monthStart && created <= monthEnd
-        }).length
-        monthlyCounts.push(count)
-      }
-      eventsMonthlyOptions.value.xaxis.categories = months as any
-      eventsMonthlySeries.value = [{
-        name: 'Sự kiện',
-        data: monthlyCounts
-      }]
-      
-      // Load participants
-      const participantsResponse = await getParticipantsPagination({ page: 1, limit: 100 })
-      const participants = (participantsResponse.data.value as any)?.data || []
-      stats.value.totalParticipants = participants.length
-      
-      // Participants over time (last 7 days)
-      const days: string[] = []
-      const dailyCounts: number[] = []
-      for (let i = 6; i >= 0; i--) {
-        const date = new Date()
-        date.setDate(date.getDate() - i)
-        days.push(date.toLocaleDateString('vi-VN', { month: 'short', day: 'numeric' }))
-        const dayStart = new Date(date.setHours(0, 0, 0, 0))
-        const dayEnd = new Date(date.setHours(23, 59, 59, 999))
-        const count = participants.filter((p: any) => {
-          const created = new Date(p.created_at)
-          return created >= dayStart && created <= dayEnd
-        }).length
-        dailyCounts.push(count)
-      }
-      participantsOverTimeOptions.value.xaxis.categories = days as any
-      participantsOverTimeSeries.value = [{
-        name: 'Người tham gia',
-        data: dailyCounts
-      }]
+    }
+
+    // Load events by status
+    const eventsByStatusData = await getEventsByStatus() as any
+    if (eventsByStatusData) {
+      eventsByStatusSeries.value = eventsByStatusData.series || [0, 0, 0, 0]
+    }
+
+    // Load events monthly
+    const eventsMonthlyData = await getEventsMonthly() as any
+    if (eventsMonthlyData) {
+      eventsMonthlyOptions.value.xaxis.categories = eventsMonthlyData.categories as any
+      eventsMonthlySeries.value = eventsMonthlyData.series || []
+    }
+
+    // Load participants over time
+    const participantsOverTimeData = await getParticipantsOverTime() as any
+    if (participantsOverTimeData) {
+      participantsOverTimeOptions.value.xaxis.categories = participantsOverTimeData.categories as any
+      participantsOverTimeSeries.value = participantsOverTimeData.series || []
+    }
+
+    // Load top organizers
+    const topOrganizersData = await getTopOrganizers() as any
+    if (topOrganizersData) {
+      topOrganizersOptions.value.xaxis.categories = topOrganizersData.categories as any
+      topOrganizersSeries.value = topOrganizersData.series || []
+    }
+
+    // Load recent events
+    const recentEventsData = await getRecentEvents() as any
+    if (recentEventsData && recentEventsData.data) {
+      recentEvents.value = recentEventsData.data
     }
   } catch (error) {
-    // If API fails, keep using fake data
     console.error('Error loading dashboard data:', error)
   }
 }
@@ -605,3 +581,13 @@ onMounted(() => {
   loadDashboardData()
 })
 </script>
+
+<style scoped>
+/* Mobile table styles */
+@media (max-width: 768px) {
+  :deep(.mobile-table .p-datatable-tbody > tr > td),
+  :deep(.mobile-table .p-datatable-thead > tr > th) {
+    white-space: nowrap;
+  }
+}
+</style>

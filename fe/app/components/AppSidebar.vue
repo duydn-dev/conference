@@ -1,5 +1,5 @@
 <template>
-  <aside class="w-20 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] py-6 flex flex-col items-center gap-3">
+  <aside class="hidden md:flex w-20 bg-white border-r border-gray-200 min-h-[calc(100vh-73px)] py-6 flex-col items-center gap-3">
     <!-- Dashboard -->
     <NuxtLink 
       to="/" 
@@ -27,13 +27,13 @@
       <i :class="getIconClass('/organizer-units', 'pi-building')"></i>
     </NuxtLink>
     
-    <!-- Thông báo -->
+    <!-- Mini Game -->
     <NuxtLink 
-      to="/notifications" 
-      v-tooltip.right="'Thông báo'"
-      :class="getLinkClass('/notifications')"
+      to="/minigames" 
+      v-tooltip.right="'Mini Game'"
+      :class="getLinkClass('/minigames')"
     >
-      <i :class="getIconClass('/notifications', 'pi-bell')"></i>
+      <i :class="getIconClass('/minigames', 'pi-trophy')"></i>
     </NuxtLink>
   </aside>
 </template>

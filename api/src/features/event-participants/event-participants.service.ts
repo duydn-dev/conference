@@ -3,8 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { CreateEventParticipantDto } from './dto/create-event-participant.dto';
 import { UpdateEventParticipantDto } from './dto/update-event-participant.dto';
-import { EventParticipant, ImportSource } from './entities/event-participant.entity';
+import { EventParticipant, ImportSource, ParticipantStatus } from './entities/event-participant.entity';
 import { ParticipantsService } from '../participants/participants.service';
+import { EventsService } from '../events/events.service';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationReceiversService } from '../notification-receivers/notification-receivers.service';
+import { NotificationType } from '../notifications/entities/notification.entity';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -16,6 +20,12 @@ export class EventParticipantsService {
     private readonly eventParticipantsRepository: Repository<EventParticipant>,
     @Inject(forwardRef(() => ParticipantsService))
     private readonly participantsService: ParticipantsService,
+    @Inject(forwardRef(() => EventsService))
+    private readonly eventsService: EventsService,
+    @Inject(forwardRef(() => NotificationsService))
+    private readonly notificationsService: NotificationsService,
+    @Inject(forwardRef(() => NotificationReceiversService))
+    private readonly notificationReceiversService: NotificationReceiversService,
   ) {}
 
   async create(dto: CreateEventParticipantDto): Promise<EventParticipant> {
@@ -325,5 +335,78 @@ export class EventParticipantsService {
 
     this.logger.log(`Excel import completed for event ${eventId}: ${success} succeeded, ${failed} failed`);
     return { success, failed, errors, participants };
+  }
+
+  /**
+   * Check-in participant và cấp số thứ tự
+   * Nếu participant là receptionist, gửi thông báo cho representative của event
+   */
+  async checkIn(id: string): Promise<EventParticipant> {
+    this.logger.log(`Checking in event-participant: ${id}`);
+
+    // Lấy event participant với relations
+    const eventParticipant = await this.eventParticipantsRepository.findOne({
+      where: { id },
+      relations: ['participant', 'event'],
+    });
+
+    if (!eventParticipant) {
+      throw new NotFoundException(`EventParticipant with id ${id} not found`);
+    }
+
+    // Kiểm tra đã check-in chưa
+    if (eventParticipant.status === ParticipantStatus.CHECKED_IN) {
+      throw new BadRequestException('Participant đã được check-in rồi');
+    }
+
+    // Đếm số người đã check-in trong event để cấp serial_number
+    const checkedInCount = await this.eventParticipantsRepository.count({
+      where: {
+        event_id: eventParticipant.event_id,
+        status: ParticipantStatus.CHECKED_IN,
+      },
+    });
+
+    const serialNumber = checkedInCount + 1;
+    const checkinTime = new Date();
+
+    // Cập nhật event participant
+    eventParticipant.status = ParticipantStatus.CHECKED_IN;
+    eventParticipant.checkin_time = checkinTime;
+    eventParticipant.serial_number = serialNumber;
+
+    const updated = await this.eventParticipantsRepository.save(eventParticipant);
+
+    // Kiểm tra participant có phải là receptionist không
+    const participant = await this.participantsService.findOne(eventParticipant.participant_id);
+    
+    if (participant.is_receptionist && eventParticipant.event.representative_identity) {
+      // Tìm representative của event
+      const representative = await this.participantsService.findByIdentityNumber(
+        eventParticipant.event.representative_identity
+      );
+
+      if (representative) {
+        // Tạo thông báo
+        const notification = await this.notificationsService.create({
+          event_id: eventParticipant.event_id,
+          title: `Người đón tiếp đã đến sự kiện`,
+          message: `${participant.full_name} (${participant.identity_number}) đã check-in vào sự kiện ${eventParticipant.event.name} với số thứ tự ${serialNumber}`,
+          type: NotificationType.REMINDER,
+        });
+
+        // Gửi thông báo cho representative
+        await this.notificationReceiversService.create({
+          notification_id: notification.id,
+          participant_id: representative.id,
+          sent_at: new Date(),
+        });
+
+        this.logger.log(`Sent notification to representative ${representative.id} about receptionist check-in`);
+      }
+    }
+
+    this.logger.log(`Event-participant checked in successfully: ${id} with serial number ${serialNumber}`);
+    return updated;
   }
 }

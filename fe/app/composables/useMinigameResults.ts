@@ -19,13 +19,13 @@ export const useMinigameResults = () => {
     if (options?.participant_id) query.participant_id = options.participant_id
     if (options?.prize_id) query.prize_id = options.prize_id
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/minigame-results', { baseURL, query })
+    return await $fetch('/minigame-results', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/minigame-results/${id}`, { baseURL, query })
+    return await $fetch(`/minigame-results/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateMinigameResultDto) => {

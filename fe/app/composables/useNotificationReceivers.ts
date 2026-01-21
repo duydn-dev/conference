@@ -17,13 +17,13 @@ export const useNotificationReceivers = () => {
     if (options?.notification_id) query.notification_id = options.notification_id
     if (options?.participant_id) query.participant_id = options.participant_id
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/notification-receivers', { baseURL, query })
+    return await $fetch('/notification-receivers', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/notification-receivers/${id}`, { baseURL, query })
+    return await $fetch(`/notification-receivers/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateNotificationReceiverDto) => {

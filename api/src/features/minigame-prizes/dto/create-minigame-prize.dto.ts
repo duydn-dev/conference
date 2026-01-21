@@ -13,4 +13,12 @@ export class CreateMinigamePrizeDto {
 
   @IsInt()
   quantity: number;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  image?: string;
 }

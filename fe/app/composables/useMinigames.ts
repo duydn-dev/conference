@@ -9,6 +9,7 @@ export const useMinigames = () => {
     limit?: number
     event_id?: string
     status?: number // MinigameStatus enum value
+    search?: string
     relations?: boolean
   }) => {
     const query: any = {}
@@ -16,14 +17,15 @@ export const useMinigames = () => {
     if (options?.limit) query.limit = options.limit
     if (options?.event_id) query.event_id = options.event_id
     if (options?.status !== undefined) query.status = options.status
+    if (options?.search) query.search = options.search
     if (options?.relations) query.relations = 'true'
-    return await useFetch('/minigames', { baseURL, query })
+    return await $fetch('/minigames', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/minigames/${id}`, { baseURL, query })
+    return await $fetch(`/minigames/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateMinigameDto) => {

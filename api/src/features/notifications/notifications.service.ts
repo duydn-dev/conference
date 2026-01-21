@@ -141,6 +141,8 @@ export class NotificationsService {
     const message = `${organizerName} đã mời bạn tham gia sự kiện ${event.name} vào ngày ${dateStr} lúc ${timeStr}, hãy kiểm tra`;
 
     // TODO: Gọi API hệ thống khác tại đây (gửi message + danh sách khách mời)
+    // LƯU Ý: Khi gửi thông báo, cần loại trừ những participant có status = ABSENT (2)
+    // Chỉ gửi cho những participant có status = REGISTERED (0) hoặc CHECKED_IN (1)
 
     return this.create({
       event_id: event.id,
@@ -162,6 +164,8 @@ export class NotificationsService {
     const message = `${organizerName} đã thay đổi thông tin sự kiện ${event.name}, hãy kiểm tra thông tin`;
 
     // TODO: Gọi API hệ thống khác tại đây (gửi message + danh sách khách mời)
+    // LƯU Ý: Khi gửi thông báo, cần loại trừ những participant có status = ABSENT (2)
+    // Chỉ gửi cho những participant có status = REGISTERED (0) hoặc CHECKED_IN (1)
 
     return this.create({
       event_id: event.id,

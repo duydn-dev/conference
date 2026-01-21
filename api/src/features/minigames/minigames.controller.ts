@@ -17,15 +17,24 @@ export class MinigamesController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('relations') relations?: string,
+    @Query('event_id') event_id?: string,
+    @Query('status') status?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.minigamesService.findAllWithPagination(pageNum, limitNum, search);
+    const shouldLoadRelations = relations === 'true';
+    const statusNum = status ? parseInt(status, 10) : undefined;
+    return this.minigamesService.findAllWithPagination(pageNum, limitNum, search, shouldLoadRelations, event_id, statusNum);
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.minigamesService.findOne(id);
+  findOne(
+    @Param('id') id: string,
+    @Query('relations') relations?: string,
+  ) {
+    const shouldLoadRelations = relations === 'true';
+    return this.minigamesService.findOne(id, shouldLoadRelations);
   }
 
   @Patch(':id')

@@ -7,17 +7,29 @@
         <p class="text-gray-500 text-sm mt-1">Xem thông tin chi tiết sự kiện</p>
       </div>
       <Button 
-        label="Quay lại danh sách" 
+        label="Quay lại" 
         icon="pi pi-arrow-left" 
         class="p-button-text"
         @click="navigateTo('/events')"
       />
     </div>
 
-    <!-- Loading -->
-    <div v-if="loading" class="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-      <i class="pi pi-spin pi-spinner text-4xl text-gray-400"></i>
-      <p class="text-gray-500 mt-4">Đang tải dữ liệu...</p>
+    <!-- Loading State -->
+    <div v-if="loading" class="bg-white rounded-lg shadow-sm border border-gray-200 p-12">
+      <div class="space-y-6">
+        <!-- Image skeleton -->
+        <div class="h-64 bg-gray-200 rounded-lg animate-pulse"></div>
+        <!-- Content skeleton -->
+        <div class="space-y-4">
+          <div class="h-8 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+          <div class="h-4 bg-gray-200 rounded w-full animate-pulse"></div>
+          <div class="h-4 bg-gray-200 rounded w-5/6 animate-pulse"></div>
+          <div class="grid grid-cols-2 gap-4 mt-6">
+            <div class="h-20 bg-gray-200 rounded animate-pulse"></div>
+            <div class="h-20 bg-gray-200 rounded animate-pulse"></div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- Detail Content -->
@@ -49,6 +61,15 @@
               <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/90 text-xs font-medium text-gray-800">
                 <i class="pi pi-hashtag mr-1" /> {{ event.code }}
               </span>
+            </div>
+            <div class="absolute top-4 right-4">
+              <Button 
+                label="Chỉnh sửa sự kiện" 
+                icon="pi pi-pencil" 
+                severity="secondary"
+                raised
+                @click="navigateTo(`/events/${route.params.id}/edit`)"
+              />
             </div>
             <div class="absolute bottom-4 left-4 right-4 bg-black/50 backdrop-blur-sm rounded-lg p-4">
               <h2 class="text-2xl font-bold text-white mb-1">
@@ -209,25 +230,88 @@
               :rounded="true"
             />
           </div>
-          <div class="flex items-center justify-between">
+          <div v-if="event.created_at" class="flex items-center justify-between">
             <span class="text-gray-500">Ngày tạo</span>
-            <span class="font-medium">{{ event.created_at ? formatDateTime(event.created_at) : '-' }}</span>
+            <span class="font-medium">{{ formatDateTime(event.created_at) }}</span>
           </div>
-          <div class="flex items-center justify-between">
+          <div v-if="event.updated_at" class="flex items-center justify-between">
             <span class="text-gray-500">Cập nhật lần cuối</span>
-            <span class="font-medium">{{ event.updated_at ? formatDateTime(event.updated_at) : '-' }}</span>
+            <span class="font-medium">{{ formatDateTime(event.updated_at) }}</span>
           </div>
-          <div class="pt-3 mt-2 border-t border-gray-100 flex justify-end">
+          
+          <!-- Action buttons -->
+          <div v-if="shouldShowButtons" class="pt-3 mt-2 border-t border-gray-100 space-y-2">
+            <!-- Hiển thị 2 nút khi chưa xác nhận -->
+            <template v-if="!isConfirmed">
+              <Button 
+                label="Từ chối tham dự" 
+                icon="pi pi-times" 
+                class="w-full p-button-outlined p-button-sm border-red-300 hover:bg-red-50"
+                style="color: #dc2626;"
+                @click="handleRejectAttendance"
+              />
+              <Button 
+                label="Xác nhận tham dự" 
+                icon="pi pi-check" 
+                class="w-full p-button-outlined p-button-sm text-green-600 border-green-200"
+                @click="handleConfirmAttendance"
+              />
+            </template>
+            
+            <!-- Hiển thị nút "Đã tới" khi đã xác nhận nhưng chưa tới -->
             <Button 
-              label="Chỉnh sửa sự kiện" 
-              icon="pi pi-pencil" 
-              class="p-button-outlined p-button-sm text-sky-600 border-sky-200"
-              @click="navigateTo(`/events/${route.params.id}/edit`)"
+              v-else-if="isConfirmed && !hasCheckedIn"
+              label="Đã tới" 
+              icon="pi pi-check-circle" 
+              class="w-full p-button-outlined p-button-sm border-green-200"
+              style="color: #10b981;"
+              @click="handleMarkAttended"
             />
           </div>
         </div>
       </div>
     </div>
+
+    <!-- Reject Attendance Dialog -->
+    <Dialog 
+      v-model:visible="rejectDialogVisible" 
+      modal 
+      header="Từ chối tham dự sự kiện" 
+      :draggable="false"
+      position="center"
+      :style="{ width: '500px' }"
+    >
+      <div class="space-y-4">
+        <div class="flex items-start gap-3">
+          <i class="pi pi-exclamation-triangle text-orange-500 text-2xl mt-1"></i>
+          <div class="flex-1">
+            <p class="text-gray-800 mb-4">Vui lòng nhập lý do từ chối tham dự sự kiện này:</p>
+            <Textarea
+              v-model="rejectReason"
+              placeholder="Nhập lý do từ chối..."
+              rows="4"
+              class="w-full"
+              :autoResize="false"
+            />
+          </div>
+        </div>
+      </div>
+      <template #footer>
+        <Button 
+          label="Hủy" 
+          icon="pi pi-times" 
+          class="p-button-text" 
+          @click="rejectDialogVisible = false" 
+        />
+        <Button 
+          label="Xác nhận từ chối" 
+          icon="pi pi-check" 
+          class="p-button-danger" 
+          :disabled="!rejectReason || rejectReason.trim() === ''"
+          @click="submitRejectAttendance" 
+        />
+      </template>
+    </Dialog>
   </div>
 </template>
 
@@ -235,10 +319,12 @@
 import { ref, onMounted, computed } from 'vue'
 import { useEvents } from '~/composables/useEvents'
 import { useEventDocuments } from '~/composables/useEventDocuments'
+import { useEventParticipants } from '~/composables/useEventParticipants'
 import { useToastSafe } from '~/composables/useToastSafe'
 import { useRoute } from 'vue-router'
 import { EventStatus, EventStatusLabels } from '~/types/event'
 import type { EventDocument } from '~/types/event-document'
+import { ParticipantStatus } from '~/types/event-participant'
 import { formatDateTime } from '~/utils/helpers'
 import { useFileUrl } from '~/composables/useFileUrl'
 import VMap from '~/components/VMap.vue'
@@ -251,6 +337,7 @@ const route = useRoute()
 const toast = useToastSafe()
 const { getById } = useEvents()
 const { getPagination: getDocuments } = useEventDocuments()
+const { getPagination: getEventParticipants, update: updateEventParticipant, create: createEventParticipant, checkIn } = useEventParticipants()
 const { getFullUrl } = useFileUrl()
 
 const event = ref<any | null>(null)
@@ -259,15 +346,25 @@ const loading = ref(true)
 // Documents state
 const documents = ref<EventDocument[]>([])
 
+// Current user's event participant
+const currentEventParticipant = ref<any | null>(null)
+const participantLoading = ref(false)
+
+// Track confirmation state in session
+const isConfirmed = ref(false)
+
+// Reject dialog state
+const rejectDialogVisible = ref(false)
+const rejectReason = ref('')
+
 const loadEvent = async () => {
   try {
     loading.value = true
     const eventId = route.params.id as string
-    const response = await getById(eventId)
-    const data = (response.data.value as any)
+    const data = await getById(eventId)
     
     if (data) {
-      event.value = data
+      event.value = data as any
     }
   } catch (error) {
     console.error('Error loading event:', error)
@@ -281,10 +378,9 @@ const loadEvent = async () => {
 const loadDocuments = async () => {
   try {
     const eventId = route.params.id as string
-    const response = await getDocuments({ event_id: eventId, limit: 100 } as any)
-    const result = (response.data.value as any)
+    const result = await getDocuments({ event_id: eventId, limit: 100 } as any)
     if (result) {
-      documents.value = result.data || []
+      documents.value = (result as any).data || []
     }
   } catch (error) {
     console.error('Error loading documents:', error)
@@ -338,7 +434,193 @@ const getStatusLabel = (status: EventStatus | number) => {
   return EventStatusLabels[status as EventStatus] || 'Không xác định'
 }
 
+// Computed properties for button visibility
+const hasRejected = computed(() => {
+  if (!currentEventParticipant.value) return false
+  return currentEventParticipant.value.status === ParticipantStatus.ABSENT
+})
+
+const hasCheckedIn = computed(() => {
+  if (!currentEventParticipant.value) return false
+  return currentEventParticipant.value.status === ParticipantStatus.CHECKED_IN
+})
+
+const shouldShowButtons = computed(() => {
+  // Không hiển thị nút nếu đã từ chối hoặc đã check-in
+  if (hasRejected.value || hasCheckedIn.value) return false
+  // Hiển thị nút nếu có participant (đã đăng ký)
+  return !!currentEventParticipant.value
+})
+
+const loadCurrentParticipant = async () => {
+  try {
+    participantLoading.value = true
+    const eventId = route.params.id as string
+    // TODO: Replace with actual current user participant_id
+    // For now, we'll try to find the first participant or handle based on actual implementation
+    const result = await getEventParticipants({ 
+      event_id: eventId, 
+      limit: 1,
+      relations: true
+    } as any)
+    if ((result as any)?.data && (result as any).data.length > 0) {
+      const participant = (result as any).data[0]
+      currentEventParticipant.value = participant
+      
+      // Nếu participant đã có status REGISTERED, coi như đã confirm rồi
+      // Hiển thị nút "Đã tới" thay vì 2 nút ban đầu
+      // Trường hợp mới vào trang lần đầu: sẽ có participant với status REGISTERED
+      // nhưng theo logic, sẽ hiển thị 2 nút để user có thể xác nhận lại
+      // Chỉ sau khi nhấn "Xác nhận" trong session này mới hiển thị nút "Đã tới"
+      isConfirmed.value = false
+    } else {
+      currentEventParticipant.value = null
+      isConfirmed.value = false
+    }
+  } catch (error) {
+    console.error('Error loading current participant:', error)
+  } finally {
+    participantLoading.value = false
+  }
+}
+
+const handleRejectAttendance = async () => {
+  rejectReason.value = ''
+  rejectDialogVisible.value = true
+}
+
+const submitRejectAttendance = async () => {
+  if (!rejectReason.value || rejectReason.value.trim() === '') {
+    toast.add({ 
+      severity: 'warn', 
+      summary: 'Cảnh báo', 
+      detail: 'Vui lòng nhập lý do từ chối', 
+      life: 3000 
+    })
+    return
+  }
+
+  try {
+    const eventId = route.params.id as string
+    if (!currentEventParticipant.value) {
+      toast.add({ 
+        severity: 'warn', 
+        summary: 'Cảnh báo', 
+        detail: 'Bạn chưa đăng ký tham dự sự kiện này', 
+        life: 3000 
+      })
+      rejectDialogVisible.value = false
+      return
+    }
+
+    await updateEventParticipant(currentEventParticipant.value.id, {
+      status: ParticipantStatus.ABSENT
+    } as any)
+
+    // TODO: Save reject reason if needed (might need to add a field to EventParticipant entity)
+    console.log('Reject reason:', rejectReason.value)
+
+    toast.add({ 
+      severity: 'success', 
+      summary: 'Thành công', 
+      detail: 'Đã từ chối tham dự sự kiện', 
+      life: 3000 
+    })
+    
+    rejectDialogVisible.value = false
+    rejectReason.value = ''
+    await loadCurrentParticipant()
+  } catch (error: any) {
+    console.error('Error rejecting attendance:', error)
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Lỗi', 
+      detail: error.data?.message || 'Không thể từ chối tham dự', 
+      life: 3000 
+    })
+  }
+}
+
+const handleConfirmAttendance = async () => {
+  try {
+    const eventId = route.params.id as string
+    if (!currentEventParticipant.value) {
+      toast.add({ 
+        severity: 'warn', 
+        summary: 'Cảnh báo', 
+        detail: 'Bạn chưa đăng ký tham dự sự kiện này', 
+        life: 3000 
+      })
+      return
+    }
+
+    await updateEventParticipant(currentEventParticipant.value.id, {
+      status: ParticipantStatus.REGISTERED
+    } as any)
+
+    // Đánh dấu đã confirm để hiển thị nút "Đã tới"
+    isConfirmed.value = true
+
+    toast.add({ 
+      severity: 'success', 
+      summary: 'Thành công', 
+      detail: 'Đã xác nhận tham dự sự kiện', 
+      life: 3000 
+    })
+    
+    await loadCurrentParticipant()
+  } catch (error: any) {
+    console.error('Error confirming attendance:', error)
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Lỗi', 
+      detail: error.data?.message || 'Không thể xác nhận tham dự', 
+      life: 3000 
+    })
+  }
+}
+
+const handleMarkAttended = async () => {
+  try {
+    const eventId = route.params.id as string
+    if (!currentEventParticipant.value) {
+      toast.add({ 
+        severity: 'warn', 
+        summary: 'Cảnh báo', 
+        detail: 'Bạn chưa đăng ký tham dự sự kiện này', 
+        life: 3000 
+      })
+      return
+    }
+
+    // Gọi API check-in để cấp số và gửi thông báo nếu cần
+    const result = await checkIn(currentEventParticipant.value.id)
+    
+    const serialNumber = (result as any)?.serial_number
+    const message = serialNumber 
+      ? `Đã đánh dấu đã tới sự kiện. Số thứ tự của bạn: ${serialNumber}` 
+      : 'Đã đánh dấu đã tới sự kiện'
+
+    toast.add({ 
+      severity: 'success', 
+      summary: 'Thành công', 
+      detail: message, 
+      life: 3000 
+    })
+    
+    await loadCurrentParticipant()
+  } catch (error: any) {
+    console.error('Error marking attended:', error)
+    toast.add({ 
+      severity: 'error', 
+      summary: 'Lỗi', 
+      detail: error.data?.message || 'Không thể đánh dấu đã tới', 
+      life: 3000 
+    })
+  }
+}
+
 onMounted(async () => {
-  await Promise.all([loadEvent(), loadDocuments()])
+  await Promise.all([loadEvent(), loadDocuments(), loadCurrentParticipant()])
 })
 </script>

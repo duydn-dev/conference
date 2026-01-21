@@ -16,7 +16,7 @@
 
     <!-- Search and Filters -->
     <div class="flex flex-col md:flex-row gap-4">
-      <div class="flex-1 max-w-md">
+      <div class="w-full md:max-w-[250px]">
         <IconField>
           <InputIcon class="pi pi-search" />
           <InputText 
@@ -60,17 +60,12 @@
         >
           <!-- Event Image/Avatar -->
           <div class="relative h-48 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500 overflow-hidden">
-            <div v-if="event.avatar" class="absolute inset-0">
+            <div class="absolute inset-0">
               <img 
-                :src="getFullUrl(event.avatar)" 
+                :src="event.avatar ? getFullUrl(event.avatar) : '/imgs/ihanoi.png'" 
                 :alt="event.name"
                 class="w-full h-full object-cover"
               />
-            </div>
-            <div v-else class="absolute inset-0 flex items-center justify-center">
-              <div class="w-20 h-20 bg-white/20 backdrop-blur-sm rounded-full flex items-center justify-center">
-                <span class="text-4xl font-bold text-white">{{ event.name.charAt(0).toUpperCase() }}</span>
-              </div>
             </div>
             
             <!-- Status Badge -->
@@ -86,6 +81,12 @@
             <!-- Event Code -->
             <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur-sm px-3 py-1 rounded-full">
               <span class="text-sm font-semibold text-gray-800">#{{ event.code }}</span>
+            </div>
+
+            <!-- Participant Count -->
+            <div v-if="event.participants_count !== undefined" class="absolute bottom-4 right-4 bg-white/90 backdrop-blur-sm px-3 py-1.5 rounded-full flex items-center gap-1.5 shadow-md">
+              <i class="pi pi-users text-sm text-gray-700"></i>
+              <span class="text-sm font-semibold text-gray-800">{{ event.participants_count || 0 }}</span>
             </div>
           </div>
 
@@ -218,6 +219,7 @@ import { useEvents } from '~/composables/useEvents'
 import { useToast } from 'primevue/usetoast'
 import { formatDateTime, formatDateShort } from '~/utils/helpers'
 import { useFileUrl } from '~/composables/useFileUrl'
+import { EventStatus, EventStatusLabels } from '~/types/event'
 
 useHead({
   title: 'Danh sách sự kiện'
@@ -228,10 +230,10 @@ const { getPagination, remove } = useEvents()
 const { getFullUrl } = useFileUrl()
 const route = useRoute()
 
-const events = ref([])
+const events = ref<any[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
-const selectedStatus = ref<string | null>(null)
+const selectedStatus = ref<number | null>(null)
 const page = ref(1)
 const pageSize = ref(10)
 const totalRecords = ref(0)
@@ -243,8 +245,11 @@ onMounted(() => {
   if (route.query.search && typeof route.query.search === 'string') {
     searchQuery.value = route.query.search
   }
-  if (route.query.status && typeof route.query.status === 'string') {
-    selectedStatus.value = route.query.status
+  if (route.query.status) {
+    const statusNum = parseInt(String(route.query.status), 10)
+    if (!isNaN(statusNum)) {
+      selectedStatus.value = statusNum
+    }
   }
   loadEvents()
 })
@@ -262,9 +267,12 @@ watch(() => route.query.search, (newSearch) => {
 })
 
 watch(() => route.query.status, (newStatus) => {
-  if (typeof newStatus === 'string') {
-    selectedStatus.value = newStatus
-    loadEvents()
+  if (newStatus) {
+    const statusNum = parseInt(String(newStatus), 10)
+    if (!isNaN(statusNum)) {
+      selectedStatus.value = statusNum
+      loadEvents()
+    }
   } else if (newStatus === undefined) {
     selectedStatus.value = null
     loadEvents()
@@ -273,46 +281,39 @@ watch(() => route.query.status, (newStatus) => {
 
 const statusOptions = [
   { label: 'Tất cả', value: null },
-  { label: 'Bản nháp', value: 'draft' },
-  { label: 'Đã xuất bản', value: 'published' },
-  { label: 'Đã đóng', value: 'closed' },
-  { label: 'Đã hủy', value: 'cancelled' }
+  { label: EventStatusLabels[EventStatus.DRAFT], value: EventStatus.DRAFT },
+  { label: EventStatusLabels[EventStatus.PUBLISHED], value: EventStatus.PUBLISHED },
+  { label: EventStatusLabels[EventStatus.CLOSED], value: EventStatus.CLOSED },
+  { label: EventStatusLabels[EventStatus.CANCELLED], value: EventStatus.CANCELLED }
 ]
 
-const getStatusSeverity = (status: string) => {
-  const severityMap: Record<string, string> = {
-    draft: 'secondary',
-    published: 'success',
-    closed: 'info',
-    cancelled: 'danger'
+const getStatusSeverity = (status: EventStatus | number) => {
+  const map: Record<number, string> = {
+    [EventStatus.DRAFT]: 'secondary',
+    [EventStatus.PUBLISHED]: 'success',
+    [EventStatus.CLOSED]: 'info',
+    [EventStatus.CANCELLED]: 'danger'
   }
-  return severityMap[status] || 'secondary'
+  return map[Number(status)] || 'secondary'
 }
 
-const getStatusLabel = (status: string) => {
-  const labelMap: Record<string, string> = {
-    draft: 'Bản nháp',
-    published: 'Đã xuất bản',
-    closed: 'Đã đóng',
-    cancelled: 'Đã hủy'
-  }
-  return labelMap[status] || status
+const getStatusLabel = (status: EventStatus | number) => {
+  return EventStatusLabels[status as EventStatus] || 'Không xác định'
 }
 
 const loadEvents = async () => {
   try {
     loading.value = true
-    const response = await getPagination({
+    const result = await getPagination({
       page: page.value,
       limit: pageSize.value,
       search: searchQuery.value || undefined,
       status: selectedStatus.value || undefined
     })
     
-    const result = (response.data.value as any)
     if (result) {
-      events.value = result.data || []
-      totalRecords.value = result.pagination?.total || 0
+      events.value = (result as any).data || []
+      totalRecords.value = (result as any).pagination?.total || 0
     }
   } catch (error) {
     console.error('Error loading events:', error)

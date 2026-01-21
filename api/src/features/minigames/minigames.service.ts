@@ -44,19 +44,41 @@ export class MinigamesService {
     return minigames;
   }
 
-  async findAllWithPagination(page = 1, limit = 10, search?: string) {
-    this.logger.debug(`Finding minigames with pagination: page=${page}, limit=${limit}, search=${search || 'none'}`);
+  async findAllWithPagination(
+    page = 1, 
+    limit = 10, 
+    search?: string,
+    loadRelations = false,
+    event_id?: string,
+    status?: number,
+  ) {
+    this.logger.debug(`Finding minigames with pagination: page=${page}, limit=${limit}, search=${search || 'none'}, relations=${loadRelations}`);
     
-    const where = search
+    const where: any = {};
+    
+    if (search) {
+      where.name = ILike(`%${search}%`);
+    }
+    
+    if (event_id) {
+      where.event_id = event_id;
+    }
+    
+    if (status !== undefined) {
+      where.status = status;
+    }
+
+    const whereCondition = search && Object.keys(where).length === 1
       ? [
           { name: ILike(`%${search}%`) },
           { type: ILike(`%${search}%`) },
           { event_id: ILike(`%${search}%`) },
         ]
-      : {};
+      : where;
 
     const [items, total] = await this.minigamesRepository.findAndCount({
-      where,
+      where: whereCondition,
+      relations: loadRelations ? ['event'] : [],
       order: { start_time: 'ASC' },
       skip: (page - 1) * limit,
       take: limit,
@@ -75,11 +97,12 @@ export class MinigamesService {
     };
   }
 
-  async findOne(id: string): Promise<Minigame> {
-    this.logger.debug(`Finding minigame by id: ${id}`);
+  async findOne(id: string, loadRelations = false): Promise<Minigame> {
+    this.logger.debug(`Finding minigame by id: ${id}, relations=${loadRelations}`);
     
     const minigame = await this.minigamesRepository.findOne({
       where: { id },
+      relations: loadRelations ? ['event'] : [],
     });
     if (!minigame) {
       this.logger.warn(`Minigame not found: ${id}`);

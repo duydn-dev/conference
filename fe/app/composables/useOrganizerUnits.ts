@@ -15,13 +15,13 @@ export const useOrganizerUnits = () => {
     if (options?.limit) query.limit = options.limit
     if (options?.relations) query.relations = 'true'
     if (options?.search) query.search = options.search
-    return await useFetch('/organizer-units', { baseURL, query })
+    return await $fetch('/organizer-units', { baseURL, query })
   }
 
   const getById = async (id: string, options?: { relations?: boolean }) => {
     const query: any = {}
     if (options?.relations) query.relations = 'true'
-    return await useFetch(`/organizer-units/${id}`, { baseURL, query })
+    return await $fetch(`/organizer-units/${id}`, { baseURL, query })
   }
 
   const create = async (data: CreateOrganizerUnitDto) => {

@@ -27,6 +27,12 @@ export class MinigamePrize {
   @Column({ type: 'int' })
   quantity: number;
 
+  @Column({ type: 'text', nullable: true })
+  description?: string | null;
+
+  @Column({ type: 'varchar', nullable: true })
+  image?: string | null;
+
   @OneToMany(() => MinigameResult, (result) => result.prize)
   results: MinigameResult[];
 }
