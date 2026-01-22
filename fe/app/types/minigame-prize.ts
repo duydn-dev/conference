@@ -12,6 +12,7 @@ export interface MinigamePrize {
 
 // Create Minigame Prize DTO
 export interface CreateMinigamePrizeDto {
+  id: string
   minigame_id: string
   prize_name: string
   quantity: number

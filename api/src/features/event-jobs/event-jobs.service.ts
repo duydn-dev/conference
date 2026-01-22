@@ -73,6 +73,7 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
       { type: EventJobType.REMIND_BEFORE_1_DAY, diffMs: -24 * 60 * 60 * 1000 },
       { type: EventJobType.REMIND_BEFORE_4_HOURS, diffMs: -4 * 60 * 60 * 1000 },
       { type: EventJobType.REMIND_BEFORE_1_HOUR, diffMs: -1 * 60 * 60 * 1000 },
+      { type: EventJobType.EVENT_STARTED, diffMs: 0 }, // Job khi sự kiện bắt đầu
     ];
 
     for (const { type, diffMs } of offsets) {
@@ -244,6 +245,10 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
         notificationMessage = `Sự kiện ${event.name} sẽ diễn sau 1 giờ nữa, vui lòng chú ý`;
         notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
         break;
+      case EventJobType.EVENT_STARTED:
+        notificationMessage = `Sự kiện ${event.name} đã bắt đầu`;
+        notificationTitle = `Sự kiện ${event.name} đã bắt đầu`;
+        break;
     }
 
     // Tạo notification trong database
@@ -288,6 +293,14 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
       } as any);
 
     try {
+      // Nếu là job EVENT_STARTED, cập nhật trạng thái event thành STARTED
+      if (job.type === EventJobType.EVENT_STARTED) {
+        // TODO: Kiểm tra có cột is_started hoặc status cần update không
+        this.logger.log(
+          `Event ${event.id} has started at ${job.run_at.toISOString()}`,
+        );
+      }
+
       // TODO: Gọi API hệ thống khác tại đây để gửi thông báo đến danh sách khách mời
       // Ví dụ: await this.sendNotificationToExternalSystem(event, notificationMessage, eventParticipants);
 
@@ -343,5 +356,19 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours} giờ ${minutes} phút`;
   }
-}
 
+  /**
+   * Kiểm tra xem sự kiện đã bắt đầu (không tính giây)
+   * So sánh: startTime (phút) >= now (phút)
+   */
+  private hasEventStarted(eventStartTime: Date, nowTime: Date = new Date()): boolean {
+    // Loại bỏ giây và ms
+    const eventMinute = new Date(eventStartTime);
+    eventMinute.setSeconds(0, 0);
+
+    const nowMinute = new Date(nowTime);
+    nowMinute.setSeconds(0, 0);
+
+    return nowMinute >= eventMinute;
+  }
+}

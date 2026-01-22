@@ -18,7 +18,7 @@ export const formatDateTime = (date: string | Date): string => {
 }
 
 export const formatDateLong = (date: string | Date): string => {
-  return moment(date).format('DD MMM YYYY, HH:mm')
+  return moment(date).format('dddd, DD [tháng] M [năm] YYYY, HH:mm')
 }
 
 export const formatCurrency = (amount: number): string => {
@@ -26,4 +26,28 @@ export const formatCurrency = (amount: number): string => {
     style: 'currency',
     currency: 'VND'
   }).format(amount)
+}
+export function formatTimeDifferenceCustom(startTime: any, endTime: any) {
+  const now = moment(new Date());
+  const start = moment(startTime);
+  const end = moment(endTime);
+  const duration = moment.duration(start.diff(now));
+  
+  const days = Math.floor(duration.asDays());
+  const hours = duration.hours();
+  const minutes = duration.minutes();
+  
+  // Logic hiển thị theo yêu cầu của bạn
+  if(now > end){
+    return "Đã kết thúc";
+  }
+  if (days > 0) {
+    return `Bắt đầu sau: ${days} ngày, ${hours} giờ, ${minutes} phút`;
+  } else if (hours > 0) {
+    return `Bắt đầu sau: ${hours} giờ, ${minutes} phút`;
+  } else if (minutes > 0) {
+    return `Bắt đầu sau: ${minutes} phút`;
+  } else {
+    return "Đã bắt đầu";
+  }
 }

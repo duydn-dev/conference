@@ -135,7 +135,7 @@
               label="Thêm giải thưởng" 
               icon="pi pi-plus" 
               class="p-button-sm"
-              @click="openPrizeDialog"
+              @click="openPrizeDialog(undefined)"
             />
           </div>
 
@@ -375,6 +375,7 @@ const loadingPrizes = ref(false)
 const prizeDialogVisible = ref(false)
 const selectedPrize = ref<MinigamePrize | null>(null)
 const prizeFormData = ref<CreateMinigamePrizeDto>({
+  id: '',
   minigame_id: '',
   prize_name: '',
   quantity: 1,
@@ -506,7 +507,6 @@ const handleSubmit = async () => {
       end_time: formData.value.end_time ? new Date(formData.value.end_time).toISOString() : undefined,
       status: formData.value.status
     }
-    
     await update(id, payload)
     
     toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã cập nhật mini game thành công', life: 3000 })
@@ -528,6 +528,7 @@ const openPrizeDialog = (prize?: MinigamePrize) => {
   if (prize) {
     selectedPrize.value = prize
     prizeFormData.value = {
+      id: prize.id,
       minigame_id: route.params.id as string,
       prize_name: prize.prize_name,
       quantity: prize.quantity,
@@ -535,13 +536,12 @@ const openPrizeDialog = (prize?: MinigamePrize) => {
       image: prize.image || undefined
     }
   } else {
-    selectedPrize.value = null
+    selectedPrize.value = null;
     prizeFormData.value = {
+      id: '',
       minigame_id: route.params.id as string,
       prize_name: '',
-      quantity: 1,
-      description: '',
-      image: undefined
+      quantity: 0
     }
   }
   prizeDialogVisible.value = true
@@ -563,8 +563,14 @@ const handlePrizeSubmit = async () => {
     
     if (selectedPrize.value) {
       // Update
-      await updatePrize(selectedPrize.value.id, prizeFormData.value)
-      toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã cập nhật giải thưởng', life: 3000 })
+      if(selectedPrize.value.id) {
+        await updatePrize(selectedPrize.value.id, prizeFormData.value)
+        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã cập nhật giải thưởng', life: 3000 })
+      }
+      else{
+        await createPrize(prizeFormData.value)
+        toast.add({ severity: 'success', summary: 'Thành công', detail: 'Đã thêm giải thưởng', life: 3000 })
+      }
     } else {
       // Create
       await createPrize(prizeFormData.value)

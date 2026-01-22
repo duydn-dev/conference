@@ -156,7 +156,7 @@ export class DashboardService {
 
   async getRecentEvents() {
     const events = await this.eventsRepository.find({
-      order: { created_at: 'DESC' },
+      order: { start_time: 'DESC' },
       take: 10,
     });
 

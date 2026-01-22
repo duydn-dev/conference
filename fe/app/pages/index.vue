@@ -55,169 +55,171 @@
       </div>
     </div>
 
-    <!-- Large Chart Section -->
-    <Card class="w-full">
-      <template #title>
-        <div class="flex items-center gap-2">
-          <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
-          <span>Sự kiện được tạo theo tháng</span>
+    <!-- Recent Events Carousel -->
+    <div class="bg-white p-3 shadow-sm rounded">
+      <div class="flex items-center gap-2 mb-4">
+        <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
+        <span>Sự kiện sắp diễn ra</span>
+      </div>
+      
+      <!-- Carousel Container -->
+      <div class="relative">
+        <!-- Carousel Wrapper -->
+        <div class="overflow-hidden">
+          <div 
+            class="flex transition-transform duration-300 ease-in-out"
+            :style="{ transform: `translateX(-${currentSlide * slideWidth}%)` }"
+          >
+            <div 
+              v-for="(event, index) in recentEvents" 
+              :key="event.code"
+              class="flex-shrink-0 w-full md:w-1/3 px-2"
+            >
+              <NuxtLink :to="`/events/${event.id}`" class="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer">
+                <!-- Event Avatar/Image -->
+                <div class="relative h-48 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500">
+                  <img 
+                    v-if="event.avatar"
+                    :src="getFullUrl(event.avatar)" 
+                    :alt="event.name"
+                    class="w-full h-full object-cover"
+                  />
+                  <div v-else class="w-full h-full flex items-center justify-center">
+                    <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
+                      <span class="text-3xl font-bold text-white">{{ event.name?.charAt(0)?.toUpperCase() || 'E' }}</span>
+                    </div>
+                  </div>
+                  
+                  <!-- Status Badge Overlay -->
+                  <div class="absolute top-3 right-3">
+                    <!-- <Tag 
+                      :value="getStatusLabel(event.status)" 
+                      :severity="getStatusSeverity(event.status)"
+                      :rounded="true"
+                    /> -->
+                    <span :class="`text-xs font-medium px-2 py-1 rounded backdrop-blur-sm text-white bg-red-600/70 danger`">{{ formatTimeDifferenceCustom(event.start_time, event.end_time) }}</span>
+                  </div>
+                  
+                  <!-- Event Code Overlay -->
+                  <div class="absolute top-3 left-3">
+                    <span class="bg-black/50 text-white text-xs font-medium px-2 py-1 rounded backdrop-blur-sm">#{{ event.code }}</span>
+                  </div>
+                </div>
+                
+                <!-- Event Content -->
+                <div class="p-4">
+                  <!-- Event Name -->
+                  <h3 class="text-gray-800 font-semibold text-lg mb-2 line-clamp-2 min-h-[3.5rem]">{{ event.name }}</h3>
+                  
+                  <!-- Event Date -->
+                  <div class="flex items-center gap-2 text-gray-600">
+                    <i class="pi pi-calendar text-gray-400"></i>
+                    <span class="text-sm">{{ formatDateTime(event.start_time) }}</span>
+                  </div>
+                </div>
+              </NuxtLink>
+            </div>
+          </div>
         </div>
-      </template>
-      <template #content>
-        <div class="w-full">
-          <ClientOnly>
-            <apexchart
+        
+        <!-- Navigation Buttons -->
+        <button
+          v-if="recentEvents.length > itemsPerSlide"
+          @click="previousSlide"
+          :disabled="currentSlide === 0"
+          class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
+          :class="{ 'opacity-0': currentSlide === 0 }"
+        >
+          <i class="pi pi-chevron-left text-gray-600"></i>
+        </button>
+        <button
+          v-if="recentEvents.length > itemsPerSlide"
+          @click="nextSlide"
+          :disabled="currentSlide >= maxSlide"
+          class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
+          :class="{ 'opacity-0': currentSlide >= maxSlide }"
+        >
+          <i class="pi pi-chevron-right text-gray-600"></i>
+        </button>
+      </div>
+      
+      <!-- Empty State -->
+      <div v-if="recentEvents.length === 0" class="text-center py-8 text-gray-500">
+        Không có dữ liệu
+      </div>
+    </div>
+    
+    <!-- Large Chart Section -->
+    <div class="bg-white p-3 shadow-sm rounded">
+      <div class="flex items-center gap-2">
+        <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
+        <span>Sự kiện trong năm</span>
+      </div>
+      <apexchart
               type="bar"
               :options="eventsMonthlyOptions"
               :series="eventsMonthlySeries"
               height="350"
               width="100%"
             />
-          </ClientOnly>
-        </div>
-      </template>
-    </Card>
-
-    <!-- Recent Events Table - Full Width -->
-    <!-- <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-      <div class="mb-6 flex items-center gap-2">
-        <i class="pi pi-list text-sky-600 text-lg"></i>
-        <h2 class="text-lg font-semibold text-gray-800">Sự kiện gần đây</h2>
-      </div>
-      <div>
-        <DataTable :value="recentEvents" :paginator="true" :rows="5" class="p-datatable-sm mobile-table" :stripedRows="true">
-        <Column field="code" sortable>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <i class="pi pi-hashtag text-gray-500 text-xs"></i>
-              <span>Mã</span>
-            </div>
-          </template>
-          <template #body="{ data }">
-            <span class="text-gray-600">#{{ data.code }}</span>
-          </template>
-        </Column>
-        <Column field="name" sortable>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <i class="pi pi-tag text-gray-500 text-xs"></i>
-              <span>Tên</span>
-            </div>
-          </template>
-          <template #body="{ data }">
-            <div class="flex items-center gap-2">
-              <div class="w-8 h-8 bg-sky-100 rounded-full flex items-center justify-center">
-                <span class="text-xs font-semibold text-sky-600">{{ data.name.charAt(0) }}</span>
-              </div>
-              <span class="text-gray-800">{{ data.name }}</span>
-            </div>
-          </template>
-        </Column>
-        <Column field="start_time" sortable>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <i class="pi pi-calendar text-gray-500 text-xs"></i>
-              <span>Ngày</span>
-            </div>
-          </template>
-          <template #body="{ data }">
-            <div class="flex items-center gap-2">
-              <i class="pi pi-calendar text-gray-400 text-xs"></i>
-                <span>{{ formatDateLong(data.start_time) }}</span>
-            </div>
-          </template>
-        </Column>
-        <Column field="status" sortable>
-          <template #header>
-            <div class="flex items-center gap-2">
-              <i class="pi pi-info-circle text-gray-500 text-xs"></i>
-              <span>Trạng thái</span>
-            </div>
-          </template>
-          <template #body="{ data }">
-            <Tag 
-              :value="getStatusLabel(data.status)" 
-              :severity="getStatusSeverity(data.status)"
-              :rounded="true"
-            />
-          </template>
-        </Column>
-      </DataTable>
     </div>
-    </div> -->
 
     <!-- Charts Row -->
     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
       <!-- Events by Status Chart -->
-      <Card class="w-full">
-        <template #title>
-          <div class="flex items-center gap-2">
-            <i class="pi pi-chart-pie text-sky-600 text-lg"></i>
-            <span>Sự kiện theo trạng thái</span>
-          </div>
-        </template>
-        <template #content>
-          <ClientOnly>
-            <apexchart
+
+      <div class="bg-white p-3 shadow-sm rounded">
+        <div class="flex items-center gap-2">
+          <i class="pi pi-chart-pie text-sky-600 text-lg"></i>
+          <span>Sự kiện theo trạng thái</span>
+        </div>
+          <apexchart
               type="donut"
               :options="eventsByStatusOptions"
               :series="eventsByStatusSeries"
               height="350"
               width="100%"
             />
-          </ClientOnly>
-        </template>
-      </Card>
+      </div>
       
       <!-- Participants Over Time -->
-      <Card class="w-full">
-        <template #title>
-          <div class="flex items-center gap-2">
+      <div class="bg-white p-3 shadow-sm rounded">
+        <div class="flex items-center gap-2">
             <i class="pi pi-chart-line text-sky-600 text-lg"></i>
             <span>Người tham gia theo thời gian</span>
           </div>
-        </template>
-        <template #content>
-          <ClientOnly>
-            <apexchart
+          <apexchart
               type="area"
               :options="participantsOverTimeOptions"
               :series="participantsOverTimeSeries"
               width="100%"
             />
-          </ClientOnly>
-        </template>
-      </Card>
+      </div>
 
       <!-- Top Organizer Units -->
-      <Card class="w-full">
-        <template #title>
-          <div class="flex items-center gap-2">
+      <div class="bg-white p-3 shadow-sm rounded">
+        <div class="flex items-center gap-2">
             <i class="pi pi-trophy text-sky-600 text-lg"></i>
             <span>Đơn vị tổ chức hàng đầu</span>
           </div>
-        </template>
-        <template #content>
-          <ClientOnly>
-            <apexchart
+          <apexchart
               type="bar"
               :options="topOrganizersOptions"
               :series="topOrganizersSeries"
               height="350"
               width="100%"
             />
-          </ClientOnly>
-        </template>
-      </Card>
+      </div>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useDashboard } from '~/composables/useDashboard'
 import { formatDateLong } from '~/utils/helpers'
 import { EventStatus, EventStatusLabels } from '~/types/event'
+import {formatDateTime} from '~/utils/helpers'
 
 useHead({
   title: 'Trang chủ'
@@ -232,7 +234,84 @@ const stats = ref({
 })
 
 // Recent Events
-const recentEvents = ref([])
+interface EventItem {
+  id: string,
+  code: string
+  name: string
+  avatar?: string | null
+  start_time: string
+  end_time: string
+  status: number
+}
+
+const recentEvents = ref<EventItem[]>([])
+
+// File URL helper
+const { getFullUrl } = useFileUrl()
+
+// Carousel state
+const currentSlide = ref(0)
+const isMobile = ref(false)
+
+// Check if mobile
+const checkMobile = () => {
+  if (typeof window !== 'undefined') {
+    isMobile.value = window.innerWidth < 768
+  }
+}
+
+// Items per slide (1 for mobile, 3 for desktop)
+const itemsPerSlide = computed(() => isMobile.value ? 1 : 3)
+
+// Slide width percentage (100% for mobile, 33.333% for desktop)
+const slideWidth = computed(() => isMobile.value ? 100 : 33.333)
+
+// Max slide index
+const maxSlide = computed(() => {
+  if (recentEvents.value.length <= itemsPerSlide.value) return 0
+  return Math.ceil(recentEvents.value.length / itemsPerSlide.value) - 1
+})
+
+// Navigation functions
+const nextSlide = () => {
+  if (currentSlide.value < maxSlide.value) {
+    currentSlide.value++
+  }
+}
+
+const previousSlide = () => {
+  if (currentSlide.value > 0) {
+    currentSlide.value--
+  }
+}
+
+// Auto-play carousel (optional)
+let autoPlayInterval: NodeJS.Timeout | null = null
+
+const startAutoPlay = () => {
+  if (recentEvents.value.length > itemsPerSlide.value) {
+    autoPlayInterval = setInterval(() => {
+      if (currentSlide.value >= maxSlide.value) {
+        currentSlide.value = 0
+      } else {
+        currentSlide.value++
+      }
+    }, 5000) // Change slide every 5 seconds
+  }
+}
+
+const stopAutoPlay = () => {
+  if (autoPlayInterval) {
+    clearInterval(autoPlayInterval)
+    autoPlayInterval = null
+  }
+}
+
+// Handle window resize
+const handleResize = () => {
+  checkMobile()
+  currentSlide.value = 0 // Reset to first slide on resize
+}
 
 // Events by Status Chart
 const eventsByStatusOptions = ref({
@@ -567,10 +646,16 @@ const loadDashboardData = async () => {
       topOrganizersSeries.value = topOrganizersData.series || []
     }
 
-    // Load recent events
-    const recentEventsData = await getRecentEvents() as any
+    // Load recent events with pageIndex=1, pageSize=20
+    const recentEventsData = await (getRecentEvents as (pageIndex: number, pageSize: number) => Promise<any>)(1, 20)
     if (recentEventsData && recentEventsData.data) {
-      recentEvents.value = recentEventsData.data
+      // Sort events by start_time (upcoming events first)
+      const sortedEvents = [...(recentEventsData.data as EventItem[])].sort((a: EventItem, b: EventItem) => {
+        const dateA = new Date(a.start_time).getTime()
+        const dateB = new Date(b.start_time).getTime()
+        return dateA - dateB // Ascending order (earliest first)
+      })
+      recentEvents.value = sortedEvents
     }
   } catch (error) {
     console.error('Error loading dashboard data:', error)
@@ -578,16 +663,16 @@ const loadDashboardData = async () => {
 }
 
 onMounted(() => {
-  loadDashboardData()
+  checkMobile()
+  window.addEventListener('resize', handleResize)
+  loadDashboardData().then(() => {
+    startAutoPlay()
+  })
+})
+
+onUnmounted(() => {
+  stopAutoPlay()
+  window.removeEventListener('resize', handleResize)
 })
 </script>
 
-<style scoped>
-/* Mobile table styles */
-@media (max-width: 768px) {
-  :deep(.mobile-table .p-datatable-tbody > tr > td),
-  :deep(.mobile-table .p-datatable-thead > tr > th) {
-    white-space: nowrap;
-  }
-}
-</style>

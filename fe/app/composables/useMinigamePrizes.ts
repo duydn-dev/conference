@@ -34,7 +34,7 @@ export const useMinigamePrizes = () => {
 
   const update = async (id: string, data: Partial<UpdateMinigamePrizeDto>) => {
     return await useFetch(`/minigame-prizes/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: data,
       baseURL
     })
