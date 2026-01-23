@@ -383,7 +383,7 @@ const loadParticipantsForSelection = async () => {
       limit: 200,
       search: participantSearch.value
     })
-    const result = (response.data.value as any)
+    const result = (response as any)
     if (result) {
       availableParticipants.value = result.data || []
       
@@ -402,7 +402,7 @@ const loadParticipantsForSelection = async () => {
             limit: 200, 
             relations: true 
           })
-          const eventParticipantsResult = (eventParticipantsResponse.data.value as any)
+          const eventParticipantsResult = (eventParticipantsResponse as any)
           if (eventParticipantsResult && eventParticipantsResult.data) {
             const eventParticipantIds = new Set(
               eventParticipantsResult.data.map((ep: any) => ep.participant_id)
@@ -788,7 +788,7 @@ const confirmParticipants = async () => {
 
       // Sau khi tạo xong thì load lại danh sách khách mời của event
       const response = await getEventParticipants({ event_id: eventId, limit: 200, relations: true })
-      const result = (response.data.value as any)
+      const result = (response as any)
       if (result) {
         selectedParticipants.value = (result.data || []).map((ep: any) => ({
           id: ep.participant_id,
@@ -856,7 +856,7 @@ onMounted(async () => {
   if (props.eventId) {
     try {
       const response = await getEventParticipants({ event_id: props.eventId, limit: 200, relations: true })
-      const result = (response.data.value as any)
+      const result = (response as any)
       if (result) {
         selectedParticipants.value = (result.data || []).map((ep: any) => ({
           id: ep.participant_id,

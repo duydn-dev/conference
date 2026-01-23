@@ -36,7 +36,7 @@ export const useEvents = () => {
 
   const update = async (id: string, data: Partial<UpdateEventDto>) => {
     return await $fetch(`/events/${id}`, {
-      method: 'PUT',
+      method: 'PATCH',
       body: data,
       baseURL
     })

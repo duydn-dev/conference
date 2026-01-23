@@ -383,18 +383,18 @@ const loadEvent = async () => {
       return
     }
     
-    const response = await getById(eventId)
+    const response: any = await getById(eventId)
     console.log('Response:', response.data);
     console.log('eventId:', eventId);
     
-    if (response.error.value) {
+    if (response.error?.value) {
       console.error('Error loading event:', response.error.value)
       toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải thông tin sự kiện', life: 3000 })
       navigateTo('/events')
       return
     }
     
-    const event = (response.data.value as any)
+    const event = (response as any)
     console.log('Loaded event:', event)
     
     if (event) {
@@ -430,16 +430,16 @@ const loadEvent = async () => {
 const loadOrganizerUnits = async () => {
   try {
     loadingOrganizerUnits.value = true
-    const response = await getOrganizerUnits({ page: 1, limit: 100 })
+    const response: any = await getOrganizerUnits({ page: 1, limit: 100 })
     
-    if (response.error.value) {
+    if (response.error?.value) {
       console.error('Error loading organizer units:', response.error.value)
       toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
       organizerUnits.value = []
       return
     }
     
-    const result = (response.data.value as any)
+    const result = (response as any)
     
     if (result && result.data) {
       organizerUnits.value = Array.isArray(result.data) ? result.data : []
@@ -459,7 +459,7 @@ const loadDocuments = async () => {
   try {
     const eventId = route.params.id as string
     const response = await getDocuments({ event_id: eventId, limit: 100 } as any)
-    const result = (response.data.value as any)
+    const result = (response as any)
     if (result) {
       existingDocuments.value = result.data || []
       // Đồng bộ path vào documents để VFileUpload hiển thị giống avatar
@@ -478,7 +478,7 @@ const loadParticipants = async () => {
       limit: 200, 
       relations: true 
     })
-    const result = (response.data.value as any)
+    const result = (response as any)
 
     if (result && result.data) {
       const eventParticipants = result.data as any[]
@@ -494,9 +494,9 @@ const loadParticipants = async () => {
           fetchPromises.push(
             (async () => {
               try {
-                const res = await getParticipantById(ep.participant_id)
-                if (!res.error.value && res.data.value) {
-                  participantsMap[ep.participant_id] = res.data.value as any
+                const res: any = await getParticipantById(ep.participant_id)
+                if (res) {
+                  participantsMap[ep.participant_id] = res;
                 }
               } catch (err) {
                 console.error('Error loading participant detail:', err)
@@ -616,11 +616,11 @@ const handleSubmit = async () => {
     
     // Step 3: Update event participants
     // Get current participants from event
-    const currentParticipantsResponse = await getEventParticipants({ 
+    const currentParticipantsResponse: any = await getEventParticipants({ 
       event_id: eventId, 
       limit: 200 
     })
-    const currentParticipantsResult = (currentParticipantsResponse.data.value as any)
+    const currentParticipantsResult = (currentParticipantsResponse.data as any)
     const currentParticipantIds = new Set(
       (currentParticipantsResult?.data || []).map((ep: any) => ep.participant_id)
     )

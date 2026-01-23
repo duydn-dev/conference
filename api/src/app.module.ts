@@ -19,6 +19,8 @@ import { EventJobsModule } from './features/event-jobs';
 import { DashboardModule } from './features/dashboard/dashboard.module';
 import { AuthModule } from './auth/auth.module';
 import { LoggerModule } from './common/logger/logger.module';
+import { EncryptionModule } from './common/encryption/encryption.module';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -43,6 +45,7 @@ import { LoggerModule } from './common/logger/logger.module';
         autoLoadEntities: true,
       }),
     }),
+    HttpModule,
     EventsModule,
     ParticipantsModule,
     OrganizerUnitsModule,
@@ -58,6 +61,7 @@ import { LoggerModule } from './common/logger/logger.module';
     AuthModule,
     EventJobsModule,
     DashboardModule,
+    EncryptionModule,
   ],
   controllers: [AppController],
   providers: [AppService],

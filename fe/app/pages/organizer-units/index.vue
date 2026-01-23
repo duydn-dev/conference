@@ -234,8 +234,7 @@ const loadOrganizerUnits = async () => {
       limit: pageSize.value,
       search: searchQuery.value || undefined
     })
-    
-    const result = (response.data.value as any)
+    const result = (response as any)
     if (result) {
       organizerUnits.value = result.data || []
       totalRecords.value = result.pagination?.total || 0

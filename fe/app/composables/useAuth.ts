@@ -48,10 +48,10 @@ export const useAuth = () => {
 
   const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     loading.value = true
-    
+    const apiBase = config.public.apiBase || 'http://localhost:3001'
     try {
       const response = await $fetch<AuthResponse>(
-        `${config.public.apiBase}/auth/login`,
+        `${apiBase}/auth/login`,
         {
           method: 'POST',
           body: {

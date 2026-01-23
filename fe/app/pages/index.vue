@@ -73,48 +73,61 @@
             <div 
               v-for="(event, index) in recentEvents" 
               :key="event.code"
-              class="flex-shrink-0 w-full md:w-1/3 px-2"
+              class="flex-shrink-0 w-full md:w-1/3 px-3"
             >
-              <NuxtLink :to="`/events/${event.id}`" class="bg-white rounded-lg border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 cursor-pointer">
+              <NuxtLink 
+                :to="`/events/${event.id}`" 
+                class="block bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:border-sky-300 transition-all duration-300 cursor-pointer group h-full"
+              >
                 <!-- Event Avatar/Image -->
-                <div class="relative h-48 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500">
+                <div class="relative h-52 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500 overflow-hidden">
                   <img 
                     v-if="event.avatar"
                     :src="getFullUrl(event.avatar)" 
                     :alt="event.name"
-                    class="w-full h-full object-cover"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
                   />
                   <div v-else class="w-full h-full flex items-center justify-center">
-                    <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm">
-                      <span class="text-3xl font-bold text-white">{{ event.name?.charAt(0)?.toUpperCase() || 'E' }}</span>
+                    <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+                      <span class="text-4xl font-bold text-white">{{ event.name?.charAt(0)?.toUpperCase() || 'E' }}</span>
                     </div>
                   </div>
                   
+                  <!-- Gradient Overlay -->
+                  <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
+                  
                   <!-- Status Badge Overlay -->
-                  <div class="absolute top-3 right-3">
-                    <!-- <Tag 
-                      :value="getStatusLabel(event.status)" 
-                      :severity="getStatusSeverity(event.status)"
-                      :rounded="true"
-                    /> -->
-                    <span :class="`text-xs font-medium px-2 py-1 rounded backdrop-blur-sm text-white bg-red-600/70 danger`">{{ formatTimeDifferenceCustom(event.start_time, event.end_time) }}</span>
+                  <div class="absolute top-3 right-3 z-10">
+                    <span class="text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md text-white bg-red-500/80 shadow-lg">
+                      {{ formatTimeDifferenceCustom(event.start_time, event.end_time) }}
+                    </span>
                   </div>
                   
                   <!-- Event Code Overlay -->
-                  <div class="absolute top-3 left-3">
-                    <span class="bg-black/50 text-white text-xs font-medium px-2 py-1 rounded backdrop-blur-sm">#{{ event.code }}</span>
+                  <div class="absolute top-3 left-3 z-10">
+                    <span class="bg-black/60 backdrop-blur-md text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
+                      #{{ event.code }}
+                    </span>
                   </div>
                 </div>
                 
                 <!-- Event Content -->
-                <div class="p-4">
+                <div class="p-5">
                   <!-- Event Name -->
-                  <h3 class="text-gray-800 font-semibold text-lg mb-2 line-clamp-2 min-h-[3.5rem]">{{ event.name }}</h3>
+                  <h3 class="text-gray-900 font-bold text-lg mb-3 line-clamp-2 min-h-[3.5rem] group-hover:text-sky-600 transition-colors duration-300">
+                    {{ event.name }}
+                  </h3>
                   
                   <!-- Event Date -->
-                  <div class="flex items-center gap-2 text-gray-600">
-                    <i class="pi pi-calendar text-gray-400"></i>
-                    <span class="text-sm">{{ formatDateTime(event.start_time) }}</span>
+                  <div class="flex items-center gap-2 text-gray-600 mb-2">
+                    <i class="pi pi-calendar text-sky-500"></i>
+                    <span class="text-sm font-medium">{{ formatDateTime(event.start_time) }}</span>
+                  </div>
+                  
+                  <!-- View More Indicator -->
+                  <div class="flex items-center gap-2 text-sky-600 text-sm font-medium mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <span>Xem chi tiết</span>
+                    <i class="pi pi-arrow-right text-xs"></i>
                   </div>
                 </div>
               </NuxtLink>
@@ -217,9 +230,8 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted } from 'vue'
 import { useDashboard } from '~/composables/useDashboard'
-import { formatDateLong } from '~/utils/helpers'
+import { formatDateLong, formatDateTime, formatTimeDifferenceCustom } from '~/utils/helpers'
 import { EventStatus, EventStatusLabels } from '~/types/event'
-import {formatDateTime} from '~/utils/helpers'
 
 useHead({
   title: 'Trang chủ'
@@ -627,10 +639,62 @@ const loadDashboardData = async () => {
 
     // Load events monthly
     const eventsMonthlyData = await getEventsMonthly() as any
+    
+    // Tạo mảng 12 tháng cố định từ tháng 1 đến tháng 12
+    const monthLabels = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
+                         'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
+    
+    // Khởi tạo mảng data với 12 phần tử = 0
+    const monthlyData = new Array(12).fill(0)
+    
     if (eventsMonthlyData) {
-      eventsMonthlyOptions.value.xaxis.categories = eventsMonthlyData.categories as any
-      eventsMonthlySeries.value = eventsMonthlyData.series || []
+      // Xử lý dữ liệu từ API
+      let apiData: number[] = []
+      let apiCategories: string[] = []
+      
+      // Kiểm tra format của series
+      if (Array.isArray(eventsMonthlyData.series)) {
+        if (eventsMonthlyData.series.length > 0 && Array.isArray(eventsMonthlyData.series[0]?.data)) {
+          // Format: { series: [{ data: [1, 2, 3] }], categories: [...] }
+          apiData = eventsMonthlyData.series[0].data
+          apiCategories = eventsMonthlyData.categories || []
+        } else if (typeof eventsMonthlyData.series[0] === 'number') {
+          // Format: { series: [1, 2, 3], categories: [...] }
+          apiData = eventsMonthlyData.series
+          apiCategories = eventsMonthlyData.categories || []
+        }
+      }
+      
+      // Map dữ liệu từ API vào đúng tháng
+      apiCategories.forEach((category: string, index: number) => {
+        // Parse category để lấy số tháng
+        // Hỗ trợ các format: "2024-01", "01", "Tháng 1", "1"
+        let monthIndex = -1
+        
+        // Format: "2024-01" hoặc "2024-1"
+        const yearMonthMatch = category.match(/-(\d{1,2})$/)?.[1]
+        if (yearMonthMatch) {
+          monthIndex = parseInt(yearMonthMatch, 10) - 1
+        } else {
+          // Format: "01", "1", "Tháng 1"
+          const monthMatch = category.match(/(\d{1,2})/)?.[1]
+          if (monthMatch) {
+            monthIndex = parseInt(monthMatch, 10) - 1
+          }
+        }
+        
+        if (monthIndex >= 0 && monthIndex < 12 && apiData[index] !== undefined) {
+          monthlyData[monthIndex] = apiData[index] || 0
+        }
+      })
     }
+    
+    // Set categories và series - luôn có 12 tháng
+    eventsMonthlyOptions.value.xaxis.categories = monthLabels
+    eventsMonthlySeries.value = [{
+      name: 'Sự kiện',
+      data: monthlyData
+    }]
 
     // Load participants over time
     const participantsOverTimeData = await getParticipantsOverTime() as any

@@ -307,18 +307,18 @@ const statusOptions = [
 const loadOrganizerUnits = async () => {
   try {
     loadingOrganizerUnits.value = true
-    const response = await getOrganizerUnits({ page: 1, limit: 100 })
+    const response: any = await getOrganizerUnits({ page: 1, limit: 100 })
     
     console.log('Organizer units response:', response)
     
-    if (response.error.value) {
+    if (response.error?.value) {
       console.error('Error loading organizer units:', response.error.value)
       toast.add({ severity: 'error', summary: 'Lỗi', detail: 'Không thể tải danh sách đơn vị tổ chức', life: 3000 })
       organizerUnits.value = []
       return
     }
     
-    const result = (response.data.value as any)
+    const result = (response as any)
     console.log('Organizer units result:', result)
     
     if (result && result.data) {
@@ -386,7 +386,7 @@ const handleSubmit = async () => {
 
     // Step 1: Create event
     const response = await create(data)
-    const createdEvent = (response.data.value as any)
+    const createdEvent = (response as any)
     
     if (!createdEvent?.id) {
       throw new Error('Failed to create event')

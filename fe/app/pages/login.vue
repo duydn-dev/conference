@@ -18,13 +18,13 @@
           <div>
             <label for="username" class="block text-sm font-medium text-gray-700 mb-2">
               <i class="pi pi-user mr-2"></i>
-              Tên đăng nhập hoặc Email
+              Tên đăng nhập
             </label>
             <InputText
               id="username"
               v-model="form.username"
               type="text"
-              placeholder="Nhập tên đăng nhập hoặc email"
+              placeholder="Nhập tên đăng nhập"
               class="w-full"
               :class="{ 'p-invalid': errors.username }"
               :disabled="loading"

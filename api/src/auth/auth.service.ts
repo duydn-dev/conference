@@ -1,8 +1,14 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { ParticipantsService } from '../features/participants/participants.service';
+import { RSAEncryptHelper } from 'src/common/encryption/rsa-encrypt-helper.service';
+import { HttpService } from '@nestjs/axios';
+import { IhanoiLoginResponse } from './dto/ihanoi.login.response';
+import { firstValueFrom } from 'rxjs';
+import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
 export class AuthService {
@@ -11,81 +17,112 @@ export class AuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly participantsService: ParticipantsService,
+    private readonly rsaEncryptHelper: RSAEncryptHelper,
+    private readonly httpService: HttpService,
+    private readonly jwtService: JwtService,
   ) {}
 
   async login(loginDto: LoginDto): Promise<LoginResponseDto> {
-    this.logger.log(`Login attempt for username: ${loginDto.username}`);
+    this.logger.log('LoginDto:', loginDto);
+    const encryptedPassword = this.rsaEncryptHelper.genaratePassword(loginDto.password);
+    
+    // Lấy và validate URL
+    const iHanoiUrl = this.configService.get<string>('IHANOI_API');
+    if (!iHanoiUrl || !iHanoiUrl.trim()) {
+      throw new Error('IHANOI_API chưa được cấu hình trong file .env. Vui lòng thêm biến môi trường IHANOI_API.');
+    }
+
+    // Validate URL format
+    try {
+      new URL(iHanoiUrl);
+    } catch (error) {
+      throw new Error(`IHANOI_API không hợp lệ: ${iHanoiUrl}. Vui lòng kiểm tra lại cấu hình.`);
+    }
+
+    this.logger.log(`Calling iHanoi API: ${iHanoiUrl}`);
     
     try {
-      // TODO: Implement actual authentication logic
-      const response = {
-        token: 'accessToken',
-        user: {
-          id: '1',
-          username: 'john.doe',
-          email: 'john.doe@example.com',
-          name: 'John Doe',
-        },
-      };
-      
-      // Đồng bộ thông tin khách mời vào bảng participants nếu có gửi kèm
-      await this.syncParticipantFromLogin(loginDto);
-
-      this.logger.log(`Login successful for username: ${loginDto.username}`);
-      return Promise.resolve(response);
-    } catch (error) {
-      this.logger.error(`Login failed for username: ${loginDto.username}`, error.stack, { username: loginDto.username });
-      throw error;
-    }
-  }
-
-  /**
-   * Nếu client gửi kèm full_name, phone, identity_number khi login thì:
-   * - Tìm trong bảng participants theo identity_number hoặc phone
-   * - Nếu chưa có thì tạo mới bản ghi participant tương ứng
-   */
-  private async syncParticipantFromLogin(loginDto: LoginDto): Promise<void> {
-    const { full_name, phone, identity_number } = loginDto;
-
-    // Không có đủ dữ liệu thì bỏ qua
-    if (!full_name || (!identity_number && !phone)) {
-      return;
-    }
-
-    try {
-      const existing = await this.participantsService.findByIdentityNumberOrPhone(
-        identity_number,
-        phone,
+      // Gọi API iHanoi để login
+      const response = await firstValueFrom(
+        this.httpService.post<IhanoiLoginResponse>(
+          iHanoiUrl + "api/1.0/login",
+          {
+            username: loginDto.username,
+            password: encryptedPassword,
+            captcha: "",
+            captchaToken: ""
+          }
+        )
       );
 
-      if (existing) {
-        this.logger.debug(
-          `Participant already exists for login (id=${existing.id}, identity=${existing.identity_number}, phone=${existing.phone})`,
-        );
-        return;
+      const ihanoiData = response.data;
+      const identificationNo = ihanoiData.user.identification_no;
+
+      if (!identificationNo) {
+        throw new Error('Không tìm thấy identification_no trong response');
       }
 
-      // Tạo mới participant tối thiểu với các thông tin có được từ login
-      await this.participantsService.create({
-        full_name,
-        identity_number: identity_number || `AUTO-${Date.now()}`,
-        phone: phone || null,
-        email: null,
-        organization: null,
-        position: null,
-        is_receptionist: false,
-      } as any);
+      // Kiểm tra participant theo identification_no (identity_number trong DB)
+      let participant = await this.participantsService.findByIdentityNumber(identificationNo);
 
-      this.logger.log(
-        `Created new participant from login (full_name=${full_name}, identity_number=${identity_number}, phone=${phone})`,
-      );
+      // Map dữ liệu từ API sang participant
+      const participantData = {
+        identity_number: identificationNo,
+        full_name: ihanoiData.user.fullname,
+        email: ihanoiData.user.email || undefined,
+        phone: ihanoiData.user.phone || ihanoiData.user.cell || undefined,
+        organization: ihanoiData.user.department || undefined,
+        position: ihanoiData.user.position || undefined,
+      };
+
+      if (participant) {
+        // TH1: Đã có participant -> Update
+        this.logger.log(`Updating existing participant: ${participant.id} - ${participant.full_name}`);
+        participant = await this.participantsService.update(participant.id, participantData);
+      } else {
+        // TH2: Chưa có participant -> Create
+        this.logger.log(`Creating new participant: ${identificationNo} - ${participantData.full_name}`);
+        participant = await this.participantsService.create({
+          ...participantData,
+          id: uuidv4(),
+        });
+      }
+
+      // Map sang LoginResponseDto
+      const loginResponse: LoginResponseDto = {
+        user: {
+          id: participant.id,
+          email: participant.email || '',
+          fullname: participant.full_name,
+          sdt: participant.phone || '',
+        },
+        token: '', // Sẽ được gán sau
+      };
+
+      // Generate JWT token
+      const jwtPayload = {
+        sub: participant.id,
+        email: participant.email,
+        identity_number: participant.identity_number,
+      };
+      loginResponse.token = this.jwtService.sign(jwtPayload);
+
+      this.logger.log(`Login successful for participant: ${participant.id} - ${participant.full_name}`);
+      return loginResponse;
     } catch (error: any) {
-      this.logger.error(
-        `Failed to sync participant from login: ${error.message}`,
-        error.stack,
-        { full_name, phone, identity_number },
-      );
-      // Không throw để không làm fail luồng login, chỉ log lỗi
+      this.logger.error(`Login failed: ${error.message}`, error.stack);
+      
+      // Xử lý các loại lỗi khác nhau
+      if (error.code === 'ERR_INVALID_URL' || error.message?.includes('Invalid URL')) {
+        throw new Error(`URL không hợp lệ: ${iHanoiUrl}. Vui lòng kiểm tra biến môi trường IHANOI_API.`);
+      }
+      
+      if (error.code === 'ECONNREFUSED' || error.code === 'ENOTFOUND') {
+        throw new Error(`Không thể kết nối đến iHanoi API tại ${iHanoiUrl}. Vui lòng kiểm tra kết nối mạng và URL.`);
+      }
+      
+      const errorMessage = error?.response?.data?.message || error.message || 'Đăng nhập thất bại';
+      throw new Error(errorMessage);
     }
   }
 }

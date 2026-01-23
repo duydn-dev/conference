@@ -131,7 +131,7 @@ const loadOrganizerUnit = async () => {
     loading.value = true
     const unitId = route.params.id as string
     const response = await getById(unitId)
-    const unit = (response.data.value as any)
+    const unit = (response as any)
     
     if (unit) {
       formData.value = {
