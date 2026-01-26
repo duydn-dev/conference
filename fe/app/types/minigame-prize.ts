@@ -7,6 +7,7 @@ export interface MinigamePrize {
   description?: string | null
   image?: string | null
   remaining_quantity?: number
+  order?: number | null
   created_at?: string
 }
 
@@ -19,6 +20,7 @@ export interface CreateMinigamePrizeDto {
   description?: string
   image?: string
   remaining_quantity?: number
+  order?: number
 }
 
 // Update Minigame Prize DTO

@@ -213,7 +213,9 @@ import { useToastSafe } from '~/composables/useToastSafe'
 useHead({
   title: 'Danh sách đơn vị tổ chức'
 })
-
+definePageMeta({
+  middleware: ['auth']
+})
 const toast = useToastSafe()
 const { getPagination, remove } = useOrganizerUnits()
 

@@ -18,10 +18,21 @@ export class EventParticipantsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('event_id') event_id?: string,
+    @Query('participant_id') participant_id?: string,
+    @Query('relations') relations?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.eventParticipantsService.findAllWithPagination(pageNum, limitNum, search);
+    const shouldLoadRelations = relations === 'true';
+    return this.eventParticipantsService.findAllWithPagination(
+      pageNum,
+      limitNum,
+      search,
+      event_id,
+      participant_id,
+      shouldLoadRelations,
+    );
   }
 
   @Get(':id')

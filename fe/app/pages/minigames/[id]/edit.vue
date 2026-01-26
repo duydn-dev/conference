@@ -170,6 +170,12 @@
               </template>
             </Column>
 
+            <Column field="order" header="Thứ tự quay" sortable>
+              <template #body="{ data }">
+                <span class="text-gray-700 font-medium">{{ data.order ?? '-' }}</span>
+              </template>
+            </Column>
+
             <Column header="Thao tác" :exportable="false" style="min-width: 120px">
               <template #body="{ data }">
                 <div class="flex items-center gap-2">
@@ -249,6 +255,20 @@
             class="w-full"
             showButtons
           />
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-2">
+            Thứ tự quay <span class="text-red-500">*</span>
+          </label>
+          <InputNumber 
+            v-model="prizeFormData.order" 
+            :min="0"
+            class="w-full"
+            showButtons
+            placeholder="Giải nào sẽ được quay trước (số nhỏ hơn = quay trước)"
+          />
+          <small class="text-gray-500 mt-1 block">Số nhỏ hơn sẽ được quay trước. Ví dụ: 1 = quay đầu tiên, 2 = quay thứ hai...</small>
         </div>
 
         <div>
@@ -343,6 +363,9 @@ import type { MinigamePrize, CreateMinigamePrizeDto } from '~/types/minigame-pri
 useHead({
   title: 'Chỉnh sửa Mini Game'
 })
+definePageMeta({
+  middleware: ['auth']
+})
 
 const route = useRoute()
 const toast = useToastSafe()
@@ -380,7 +403,8 @@ const prizeFormData = ref<CreateMinigamePrizeDto>({
   prize_name: '',
   quantity: 1,
   description: '',
-  image: undefined
+  image: undefined,
+  order: 0
 })
 const prizeDialogSubmitting = ref(false)
 const deletePrizeDialogVisible = ref(false)
@@ -432,7 +456,13 @@ const loadPrizes = async () => {
     const id = route.params.id as string
     const result = await getPrizes({ minigame_id: id, limit: 1000 })
     if (result) {
-      prizes.value = (result as any).data || []
+      const loadedPrizes = (result as any).data || []
+      // Sắp xếp theo order (số nhỏ hơn = quay trước)
+      prizes.value = loadedPrizes.sort((a: MinigamePrize, b: MinigamePrize) => {
+        const orderA = a.order ?? 999999
+        const orderB = b.order ?? 999999
+        return orderA - orderB
+      })
     }
   } catch (error) {
     console.error('Error loading prizes:', error)
@@ -533,15 +563,21 @@ const openPrizeDialog = (prize?: MinigamePrize) => {
       prize_name: prize.prize_name,
       quantity: prize.quantity,
       description: prize.description || '',
-      image: prize.image || undefined
+      image: prize.image || undefined,
+      order: prize.order || 0
     }
   } else {
     selectedPrize.value = null;
+    // Tự động set order = số lượng prizes hiện tại + 1
+    const nextOrder = prizes.value.length > 0 
+      ? Math.max(...prizes.value.map(p => p.order || 0)) + 1 
+      : 1
     prizeFormData.value = {
       id: '',
       minigame_id: route.params.id as string,
       prize_name: '',
-      quantity: 0
+      quantity: 0,
+      order: nextOrder
     }
   }
   prizeDialogVisible.value = true
@@ -555,6 +591,11 @@ const handlePrizeSubmit = async () => {
   
   if (!prizeFormData.value.quantity || prizeFormData.value.quantity <= 0) {
     toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Số lượng phải lớn hơn 0', life: 3000 })
+    return
+  }
+  
+  if (prizeFormData.value.order === undefined || prizeFormData.value.order === null || prizeFormData.value.order < 0) {
+    toast.add({ severity: 'warn', summary: 'Cảnh báo', detail: 'Thứ tự phải là số lớn hơn hoặc bằng 0', life: 3000 })
     return
   }
 

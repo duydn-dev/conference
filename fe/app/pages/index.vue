@@ -14,7 +14,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Info - Tổng người tham gia -->
       <div class="bg-white rounded-lg shadow-sm border border-cyan-200 p-6">
         <div class="flex items-center justify-between">
@@ -27,7 +27,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Success - Sự kiện đang hoạt động -->
       <div class="bg-white rounded-lg shadow-sm border border-green-200 p-6">
         <div class="flex items-center justify-between">
@@ -40,7 +40,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- Warning - Sự kiện sắp diễn ra -->
       <div class="bg-white rounded-lg shadow-sm border border-amber-200 p-6">
         <div class="flex items-center justify-between">
@@ -56,76 +56,74 @@
     </div>
 
     <!-- Recent Events Carousel -->
-    <div class="bg-white p-3 shadow-sm rounded">
+    <div class="bg-white p-3 sm:p-4 shadow-sm rounded overflow-hidden">
       <div class="flex items-center gap-2 mb-4">
         <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
         <span>Sự kiện sắp diễn ra</span>
       </div>
-      
+
       <!-- Carousel Container -->
-      <div class="relative">
+      <div class="relative -mx-3 sm:mx-0">
         <!-- Carousel Wrapper -->
         <div class="overflow-hidden">
-          <div 
-            class="flex transition-transform duration-300 ease-in-out"
-            :style="{ transform: `translateX(-${currentSlide * slideWidth}%)` }"
-          >
-            <div 
-              v-for="(event, index) in recentEvents" 
-              :key="event.code"
-              class="flex-shrink-0 w-full md:w-1/3 px-3"
-            >
-              <NuxtLink 
-                :to="`/events/${event.id}`" 
-                class="block bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:border-sky-300 transition-all duration-300 cursor-pointer group h-full"
-              >
+          <div class="flex transition-transform duration-300 ease-in-out"
+            :style="{ transform: `translateX(-${currentSlide * slideWidth}%)` }">
+            <div v-for="(event, index) in recentEvents" :key="event.code"
+              class="flex-shrink-0 w-full sm:w-1/2 md:w-1/3 px-2 sm:px-3">
+              <NuxtLink :to="`/events/${event.id}`"
+                class="block bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-xl hover:border-sky-300 transition-all duration-300 cursor-pointer group h-full">
                 <!-- Event Avatar/Image -->
                 <div class="relative h-52 bg-gradient-to-br from-sky-400 via-blue-500 to-cyan-500 overflow-hidden">
-                  <img 
-                    v-if="event.avatar"
-                    :src="getFullUrl(event.avatar)" 
-                    :alt="event.name"
-                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
-                  />
+                  <img v-if="event.avatar" :src="getFullUrl(event.avatar)" :alt="event.name"
+                    class="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500" />
                   <div v-else class="w-full h-full flex items-center justify-center">
-                    <div class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
-                      <span class="text-4xl font-bold text-white">{{ event.name?.charAt(0)?.toUpperCase() || 'E' }}</span>
+                    <div
+                      class="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center backdrop-blur-sm group-hover:scale-110 transition-transform duration-300">
+                      <span class="text-4xl font-bold text-white">{{ event.name?.charAt(0)?.toUpperCase() || 'E'
+                        }}</span>
                     </div>
                   </div>
-                  
+
                   <!-- Gradient Overlay -->
-                  <div class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"></div>
-                  
+                  <div
+                    class="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  </div>
+
                   <!-- Status Badge Overlay -->
                   <div class="absolute top-3 right-3 z-10">
-                    <span class="text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md text-white bg-red-500/80 shadow-lg">
+                    <span
+                      class="text-xs font-semibold px-3 py-1.5 rounded-full backdrop-blur-md text-white bg-red-500/80 shadow-lg">
                       {{ formatTimeDifferenceCustom(event.start_time, event.end_time) }}
                     </span>
                   </div>
-                  
+
                   <!-- Event Code Overlay -->
                   <div class="absolute top-3 left-3 z-10">
-                    <span class="bg-black/60 backdrop-blur-md text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
+                    <span
+                      class="bg-black/60 backdrop-blur-md text-white text-xs font-semibold px-3 py-1.5 rounded-full shadow-lg">
                       #{{ event.code }}
                     </span>
                   </div>
                 </div>
-                
+
                 <!-- Event Content -->
-                <div class="p-5">
+                <div class="hidden sm:block p-4 sm:p-5 slide-content">
                   <!-- Event Name -->
-                  <h3 class="text-gray-900 font-bold text-lg mb-3 line-clamp-2 min-h-[3.5rem] group-hover:text-sky-600 transition-colors duration-300">
+                  <div
+                    class="text-gray-900 font-bold text-base sm:text-lg mb-3 line-clamp-2 min-h-[3rem] sm:min-h-[3.5rem] group-hover:text-sky-600 transition-colors duration-300 break-words">
                     {{ event.name }}
-                  </h3>
-                  
+                  </div>
+
                   <!-- Event Date -->
                   <div class="flex items-center gap-2 text-gray-600 mb-2">
-                    <i class="pi pi-calendar text-sky-500"></i>
-                    <span class="text-sm font-medium">{{ formatDateTime(event.start_time) }}</span>
+                    <i class="pi pi-calendar text-sky-500 flex-shrink-0"></i>
+                    <span class="text-xs sm:text-sm font-medium break-words">{{ formatDateTime(event.start_time)
+                      }}</span>
                   </div>
-                  
+
                   <!-- View More Indicator -->
-                  <div class="flex items-center gap-2 text-sky-600 text-sm font-medium mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                  <div
+                    class="flex items-center gap-2 text-sky-600 text-xs sm:text-sm font-medium mt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
                     <span>Xem chi tiết</span>
                     <i class="pi pi-arrow-right text-xs"></i>
                   </div>
@@ -134,47 +132,33 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Navigation Buttons -->
-        <button
-          v-if="recentEvents.length > itemsPerSlide"
-          @click="previousSlide"
-          :disabled="currentSlide === 0"
-          class="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
-          :class="{ 'opacity-0': currentSlide === 0 }"
-        >
+        <button v-if="recentEvents.length > itemsPerSlide" @click="previousSlide" :disabled="currentSlide === 0"
+          class="absolute left-2 sm:left-0 top-1/2 -translate-y-1/2 sm:-translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
+          :class="{ 'opacity-0': currentSlide === 0 }">
           <i class="pi pi-chevron-left text-gray-600"></i>
         </button>
-        <button
-          v-if="recentEvents.length > itemsPerSlide"
-          @click="nextSlide"
-          :disabled="currentSlide >= maxSlide"
-          class="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
-          :class="{ 'opacity-0': currentSlide >= maxSlide }"
-        >
+        <button v-if="recentEvents.length > itemsPerSlide" @click="nextSlide" :disabled="currentSlide >= maxSlide"
+          class="absolute right-2 sm:right-0 top-1/2 -translate-y-1/2 sm:translate-x-4 bg-white rounded-full p-2 shadow-lg hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-all z-10"
+          :class="{ 'opacity-0': currentSlide >= maxSlide }">
           <i class="pi pi-chevron-right text-gray-600"></i>
         </button>
       </div>
-      
+
       <!-- Empty State -->
       <div v-if="recentEvents.length === 0" class="text-center py-8 text-gray-500">
         Không có dữ liệu
       </div>
     </div>
-    
+
     <!-- Large Chart Section -->
     <div class="bg-white p-3 shadow-sm rounded">
       <div class="flex items-center gap-2">
         <i class="pi pi-chart-bar text-sky-600 text-lg"></i>
         <span>Sự kiện trong năm</span>
       </div>
-      <apexchart
-              type="bar"
-              :options="eventsMonthlyOptions"
-              :series="eventsMonthlySeries"
-              height="350"
-              width="100%"
-            />
+      <apexchart type="bar" :options="eventsMonthlyOptions" :series="eventsMonthlySeries" height="350" width="100%" />
     </div>
 
     <!-- Charts Row -->
@@ -186,42 +170,27 @@
           <i class="pi pi-chart-pie text-sky-600 text-lg"></i>
           <span>Sự kiện theo trạng thái</span>
         </div>
-          <apexchart
-              type="donut"
-              :options="eventsByStatusOptions"
-              :series="eventsByStatusSeries"
-              height="350"
-              width="100%"
-            />
+        <apexchart type="donut" :options="eventsByStatusOptions" :series="eventsByStatusSeries" height="350"
+          width="100%" />
       </div>
-      
+
       <!-- Participants Over Time -->
       <div class="bg-white p-3 shadow-sm rounded">
         <div class="flex items-center gap-2">
-            <i class="pi pi-chart-line text-sky-600 text-lg"></i>
-            <span>Người tham gia theo thời gian</span>
-          </div>
-          <apexchart
-              type="area"
-              :options="participantsOverTimeOptions"
-              :series="participantsOverTimeSeries"
-              width="100%"
-            />
+          <i class="pi pi-chart-line text-sky-600 text-lg"></i>
+          <span>Người tham gia theo thời gian</span>
+        </div>
+        <apexchart type="area" :options="participantsOverTimeOptions" :series="participantsOverTimeSeries"
+          width="100%" />
       </div>
 
       <!-- Top Organizer Units -->
       <div class="bg-white p-3 shadow-sm rounded">
         <div class="flex items-center gap-2">
-            <i class="pi pi-trophy text-sky-600 text-lg"></i>
-            <span>Đơn vị tổ chức hàng đầu</span>
-          </div>
-          <apexchart
-              type="bar"
-              :options="topOrganizersOptions"
-              :series="topOrganizersSeries"
-              height="350"
-              width="100%"
-            />
+          <i class="pi pi-trophy text-sky-600 text-lg"></i>
+          <span>Đơn vị tổ chức hàng đầu</span>
+        </div>
+        <apexchart type="bar" :options="topOrganizersOptions" :series="topOrganizersSeries" height="350" width="100%" />
       </div>
     </div>
   </div>
@@ -236,7 +205,9 @@ import { EventStatus, EventStatusLabels } from '~/types/event'
 useHead({
   title: 'Trang chủ'
 })
-
+definePageMeta({
+  middleware: ['auth']
+})
 // Stats
 const stats = ref({
   totalEvents: 0,
@@ -595,13 +566,13 @@ const topOrganizersSeries = ref([{
   data: [] as number[]
 }])
 
-const { 
-  getStats, 
-  getEventsByStatus, 
-  getEventsMonthly, 
-  getParticipantsOverTime, 
-  getTopOrganizers, 
-  getRecentEvents 
+const {
+  getStats,
+  getEventsByStatus,
+  getEventsMonthly,
+  getParticipantsOverTime,
+  getTopOrganizers,
+  getRecentEvents
 } = useDashboard()
 
 const getStatusSeverity = (status: EventStatus | number) => {
@@ -639,19 +610,19 @@ const loadDashboardData = async () => {
 
     // Load events monthly
     const eventsMonthlyData = await getEventsMonthly() as any
-    
+
     // Tạo mảng 12 tháng cố định từ tháng 1 đến tháng 12
-    const monthLabels = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6', 
-                         'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
-    
+    const monthLabels = ['Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
+      'Tháng 7', 'Tháng 8', 'Tháng 9', 'Tháng 10', 'Tháng 11', 'Tháng 12']
+
     // Khởi tạo mảng data với 12 phần tử = 0
     const monthlyData = new Array(12).fill(0)
-    
+
     if (eventsMonthlyData) {
       // Xử lý dữ liệu từ API
       let apiData: number[] = []
       let apiCategories: string[] = []
-      
+
       // Kiểm tra format của series
       if (Array.isArray(eventsMonthlyData.series)) {
         if (eventsMonthlyData.series.length > 0 && Array.isArray(eventsMonthlyData.series[0]?.data)) {
@@ -664,13 +635,13 @@ const loadDashboardData = async () => {
           apiCategories = eventsMonthlyData.categories || []
         }
       }
-      
+
       // Map dữ liệu từ API vào đúng tháng
       apiCategories.forEach((category: string, index: number) => {
         // Parse category để lấy số tháng
         // Hỗ trợ các format: "2024-01", "01", "Tháng 1", "1"
         let monthIndex = -1
-        
+
         // Format: "2024-01" hoặc "2024-1"
         const yearMonthMatch = category.match(/-(\d{1,2})$/)?.[1]
         if (yearMonthMatch) {
@@ -682,13 +653,13 @@ const loadDashboardData = async () => {
             monthIndex = parseInt(monthMatch, 10) - 1
           }
         }
-        
+
         if (monthIndex >= 0 && monthIndex < 12 && apiData[index] !== undefined) {
           monthlyData[monthIndex] = apiData[index] || 0
         }
       })
     }
-    
+
     // Set categories và series - luôn có 12 tháng
     eventsMonthlyOptions.value.xaxis.categories = monthLabels
     eventsMonthlySeries.value = [{
@@ -712,14 +683,37 @@ const loadDashboardData = async () => {
 
     // Load recent events with pageIndex=1, pageSize=20
     const recentEventsData = await (getRecentEvents as (pageIndex: number, pageSize: number) => Promise<any>)(1, 20)
+    console.log('[INDEX] Recent events data:', recentEventsData)
     if (recentEventsData && recentEventsData.data) {
-      // Sort events by start_time (upcoming events first)
+      // Sort events: upcoming events first, then past events
+      const now = new Date().getTime()
       const sortedEvents = [...(recentEventsData.data as EventItem[])].sort((a: EventItem, b: EventItem) => {
-        const dateA = new Date(a.start_time).getTime()
-        const dateB = new Date(b.start_time).getTime()
-        return dateA - dateB // Ascending order (earliest first)
+        const endTimeA = new Date(a.end_time).getTime()
+        const endTimeB = new Date(b.end_time).getTime()
+        const startTimeA = new Date(a.start_time).getTime()
+        const startTimeB = new Date(b.start_time).getTime()
+        
+        // Check if events are upcoming (not ended yet)
+        const isAUpcoming = endTimeA > now
+        const isBUpcoming = endTimeB > now
+        
+        // Upcoming events come first
+        if (isAUpcoming && !isBUpcoming) return -1
+        if (!isAUpcoming && isBUpcoming) return 1
+        
+        // If both are upcoming, sort by start_time ascending (earliest first)
+        if (isAUpcoming && isBUpcoming) {
+          return startTimeA - startTimeB
+        }
+        
+        // If both are past, sort by end_time descending (most recent first)
+        return endTimeB - endTimeA
       })
       recentEvents.value = sortedEvents
+      console.log('[INDEX] Recent events set:', recentEvents.value.length, 'events')
+      console.log('[INDEX] Recent events:', recentEvents.value)
+    } else {
+      console.warn('[INDEX] No recent events data found')
     }
   } catch (error) {
     console.error('Error loading dashboard data:', error)
@@ -740,3 +734,11 @@ onUnmounted(() => {
 })
 </script>
 
+<style scoped>
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

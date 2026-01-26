@@ -26,6 +26,13 @@ export const useParticipants = () => {
     return await $fetch(`/participants/${id}`, { baseURL, query })
   }
 
+  const getByIdentityNumber = async (identityNumber: string) => {
+    return await $fetch('/participants/by-identity', { 
+      baseURL,
+      query: { identityNumber: identityNumber }
+    })
+  }
+
   const create = async (data: CreateParticipantDto) => {
     return await useFetch('/participants', {
       method: 'POST',
@@ -52,6 +59,7 @@ export const useParticipants = () => {
   return {
     getPagination,
     getById,
+    getByIdentityNumber,
     create,
     update,
     remove

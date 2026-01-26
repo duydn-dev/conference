@@ -188,6 +188,9 @@ import { MinigameStatus, MinigameStatusLabels } from '~/types/minigame'
 useHead({
   title: 'Danh sách Mini Game'
 })
+definePageMeta({
+  middleware: ['auth']
+})
 
 const toast = process.client ? useToast() : null
 const { getPagination, remove } = useMinigames()

@@ -136,7 +136,7 @@
                 class="p-button-text p-button-sm text-sky-600 hover:text-sky-700"
                 @click.stop="navigateTo(`/events/${event.id}`)"
               />
-              <div class="flex items-center gap-2">
+              <div v-if="isEventRepresentative(event)" class="flex items-center gap-2">
                 <Button 
                   icon="pi pi-pencil" 
                   class="p-button-text p-button-sm p-button-rounded text-gray-600 hover:text-sky-600"
@@ -213,16 +213,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue'
+import { ref, onMounted, watch, computed } from 'vue'
 import { useRoute } from 'vue-router'
 import { useEvents } from '~/composables/useEvents'
 import { useToast } from 'primevue/usetoast'
 import { formatDateTime, formatDateShort } from '~/utils/helpers'
 import { useFileUrl } from '~/composables/useFileUrl'
+import { useAuth, getUser } from '~/composables/useAuth'
 import { EventStatus, EventStatusLabels } from '~/types/event'
 
 useHead({
   title: 'Danh sách sự kiện'
+})
+definePageMeta({
+  middleware: ['auth']
 })
 
 const toast = process.client ? useToast() : null
@@ -239,6 +243,22 @@ const pageSize = ref(10)
 const totalRecords = ref(0)
 const deleteDialogVisible = ref(false)
 const selectedEvent = ref<any>(null)
+
+// Get current user
+const currentUser = computed(() => {
+  if (process.client) {
+    return getUser()
+  }
+  return null
+})
+
+// Check if current user is the representative of an event
+const isEventRepresentative = (event: any) => {
+  if (!currentUser.value?.identity_number || !event?.representative_identity) {
+    return false
+  }
+  return currentUser.value.identity_number === event.representative_identity
+}
 
 // Initialize search query and status from URL
 onMounted(() => {

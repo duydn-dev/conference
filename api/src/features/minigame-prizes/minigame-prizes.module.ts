@@ -8,5 +8,6 @@ import { MinigamePrize } from './entities/minigame-prize.entity';
   imports: [TypeOrmModule.forFeature([MinigamePrize])],
   controllers: [MinigamePrizesController],
   providers: [MinigamePrizesService],
+  exports: [MinigamePrizesService],
 })
 export class MinigamePrizesModule {}

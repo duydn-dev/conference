@@ -17,10 +17,28 @@ export class MinigameResultsController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
+    @Query('minigame_id') minigame_id?: string,
+    @Query('participant_id') participant_id?: string,
+    @Query('prize_id') prize_id?: string,
+    @Query('relations') relations?: string,
   ) {
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 10;
-    return this.minigameResultsService.findAllWithPagination(pageNum, limitNum, search);
+    const shouldLoadRelations = relations === 'true';
+    return this.minigameResultsService.findAllWithPagination(
+      pageNum,
+      limitNum,
+      search,
+      minigame_id,
+      participant_id,
+      prize_id,
+      shouldLoadRelations,
+    );
+  }
+
+  @Get('by-minigame/:minigameId')
+  findByMinigameId(@Param('minigameId') minigameId: string) {
+    return this.minigameResultsService.findByMinigameId(minigameId);
   }
 
   @Get(':id')

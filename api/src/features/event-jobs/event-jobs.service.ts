@@ -9,6 +9,9 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationReceiversService } from '../notification-receivers/notification-receivers.service';
 import { EventParticipantsService } from '../event-participants/event-participants.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { ParticipantStatus } from '../event-participants/entities/event-participant.entity';
+import { SocketGateway } from '../../common/socket/socket.gateway';
+import { SocketService } from '../../common/socket/socket.service';
 
 @Injectable()
 export class EventJobsService implements OnModuleInit, OnModuleDestroy {
@@ -27,6 +30,8 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
     private readonly notificationReceiversService: NotificationReceiversService,
     @Inject(forwardRef(() => EventParticipantsService))
     private readonly eventParticipantsService: EventParticipantsService,
+    private readonly socketGateway: SocketGateway,
+    private readonly socketService: SocketService,
   ) {}
 
   /**
@@ -234,20 +239,20 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
 
     switch (job.type) {
       case EventJobType.REMIND_BEFORE_1_DAY:
-        notificationMessage = `Sự kiện ${event.name} được tổ chức vào ${formattedDate} lúc ${formattedTime}, vui lòng chú ý`;
-        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        notificationMessage = `Kính gửi Quý đại biểu,\n\nTrân trọng thông báo sự kiện "${event.name}" sẽ được tổ chức vào ngày ${formattedDate} lúc ${formattedTime}.\n\nKính mong Quý đại biểu sắp xếp thời gian tham dự đúng giờ.\n\nTrân trọng.`;
+        notificationTitle = `Thông báo nhắc nhở về sự kiện "${event.name}"`;
         break;
       case EventJobType.REMIND_BEFORE_4_HOURS:
-        notificationMessage = `Sự kiện ${event.name} được tổ chức vào 4 giờ nữa, vui lòng chú ý`;
-        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        notificationMessage = `Kính gửi Quý đại biểu,\n\nTrân trọng thông báo sự kiện "${event.name}" sẽ được tổ chức sau 4 giờ nữa.\n\nKính mong Quý đại biểu sắp xếp thời gian tham dự đúng giờ.\n\nTrân trọng.`;
+        notificationTitle = `Thông báo nhắc nhở về sự kiện "${event.name}"`;
         break;
       case EventJobType.REMIND_BEFORE_1_HOUR:
-        notificationMessage = `Sự kiện ${event.name} sẽ diễn sau 1 giờ nữa, vui lòng chú ý`;
-        notificationTitle = `Nhắc nhở sự kiện ${event.name}`;
+        notificationMessage = `Kính gửi Quý đại biểu,\n\nTrân trọng thông báo sự kiện "${event.name}" sẽ được tổ chức sau 1 giờ nữa.\n\nKính mong Quý đại biểu sắp xếp thời gian tham dự đúng giờ.\n\nTrân trọng.`;
+        notificationTitle = `Thông báo nhắc nhở về sự kiện "${event.name}"`;
         break;
       case EventJobType.EVENT_STARTED:
-        notificationMessage = `Sự kiện ${event.name} đã bắt đầu`;
-        notificationTitle = `Sự kiện ${event.name} đã bắt đầu`;
+        notificationMessage = `Kính gửi Quý đại biểu,\n\nTrân trọng thông báo sự kiện "${event.name}" đã chính thức bắt đầu.\n\nTrân trọng kính mời Quý đại biểu tham dự.\n\nTrân trọng.`;
+        notificationTitle = `Thông báo về việc sự kiện "${event.name}" đã bắt đầu`;
         break;
     }
 
@@ -263,12 +268,56 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
       });
 
       // Lấy danh sách participants của event và tạo notification receivers
+      this.logger.log(`[EVENT_JOB] Fetching event participants for event ${event.id}...`);
       const eventParticipants = await this.eventParticipantsService.findByEventId(event.id);
+      this.logger.log(`[EVENT_JOB] Found ${eventParticipants.length} participants for event ${event.id}`);
+      
+      const participantIds: string[] = [];
+      let receiverSuccessCount = 0;
+      let receiverErrorCount = 0;
+      
+      this.logger.log(`[EVENT_JOB] Creating NotificationReceiver entries for ${eventParticipants.length} participants...`);
       for (const ep of eventParticipants) {
-        await this.notificationReceiversService.create({
-          notification_id: notification.id,
-          participant_id: ep.participant_id,
-        });
+        try {
+          await this.notificationReceiversService.create({
+            notification_id: notification.id,
+            participant_id: ep.participant_id,
+            sent_at: new Date(),
+          });
+          receiverSuccessCount++;
+          participantIds.push(ep.participant_id);
+        } catch (error) {
+          receiverErrorCount++;
+          this.logger.error(`[EVENT_JOB] Failed to create notification receiver for participant ${ep.participant_id}: ${error.message}`, error.stack);
+        }
+      }
+      
+      this.logger.log(`[EVENT_JOB] NotificationReceiver creation: ${receiverSuccessCount} success, ${receiverErrorCount} errors`);
+
+      // Gửi notification qua Socket.IO đến tất cả participants (trừ ABSENT)
+      try {
+        const activeParticipantIds = eventParticipants
+          .filter(ep => ep.status !== ParticipantStatus.ABSENT)
+          .map(ep => ep.participant_id);
+        
+        for (const participantId of activeParticipantIds) {
+          const socketIds = this.socketService.getSocketIds(participantId);
+          if (socketIds.length > 0) {
+            socketIds.forEach(socketId => {
+              this.socketGateway.server.to(socketId).emit('notification', {
+                id: notification.id,
+                event_id: notification.event_id,
+                title: notification.title,
+                message: notification.message,
+                type: notification.type,
+                created_at: notification.created_at,
+              });
+            });
+          }
+        }
+        this.logger.log(`Sent scheduled notification to ${activeParticipantIds.length} participants via Socket.IO`);
+      } catch (socketError) {
+        this.logger.warn(`Failed to send scheduled notification via Socket.IO: ${socketError.message}`);
       }
 
       this.logger.log(
@@ -301,7 +350,7 @@ export class EventJobsService implements OnModuleInit, OnModuleDestroy {
         );
       }
 
-      // TODO: Gọi API hệ thống khác tại đây để gửi thông báo đến danh sách khách mời
+      // Notification đã được gửi qua Socket.IO ở trên
       // Ví dụ: await this.sendNotificationToExternalSystem(event, notificationMessage, eventParticipants);
 
       const response = await fetch(url, {

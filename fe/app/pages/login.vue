@@ -136,10 +136,6 @@ useHead({
   title: 'Đăng nhập'
 })
 
-definePageMeta({
-  layout: 'auth'
-})
-
 const router = useRouter()
 const { login } = useAuth()
 

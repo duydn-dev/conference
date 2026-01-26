@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException, forwardRef, Inject, Logger } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { ILike, Repository } from 'typeorm';
+import { InjectRepository, InjectDataSource } from '@nestjs/typeorm';
+import { ILike, Repository, DataSource } from 'typeorm';
 import { CreateEventParticipantDto } from './dto/create-event-participant.dto';
 import { UpdateEventParticipantDto } from './dto/update-event-participant.dto';
 import { EventParticipant, ImportSource, ParticipantStatus } from './entities/event-participant.entity';
@@ -9,6 +9,8 @@ import { EventsService } from '../events/events.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationReceiversService } from '../notification-receivers/notification-receivers.service';
 import { NotificationType } from '../notifications/entities/notification.entity';
+import { SocketGateway } from '../../common/socket/socket.gateway';
+import { SocketService } from '../../common/socket/socket.service';
 import { v4 as uuidv4 } from 'uuid';
 
 @Injectable()
@@ -18,6 +20,8 @@ export class EventParticipantsService {
   constructor(
     @InjectRepository(EventParticipant)
     private readonly eventParticipantsRepository: Repository<EventParticipant>,
+    @InjectDataSource()
+    private readonly dataSource: DataSource,
     @Inject(forwardRef(() => ParticipantsService))
     private readonly participantsService: ParticipantsService,
     @Inject(forwardRef(() => EventsService))
@@ -26,6 +30,8 @@ export class EventParticipantsService {
     private readonly notificationsService: NotificationsService,
     @Inject(forwardRef(() => NotificationReceiversService))
     private readonly notificationReceiversService: NotificationReceiversService,
+    private readonly socketGateway: SocketGateway,
+    private readonly socketService: SocketService,
   ) {}
 
   async create(dto: CreateEventParticipantDto): Promise<EventParticipant> {
@@ -33,8 +39,24 @@ export class EventParticipantsService {
     this.logger.log(`Creating event-participant: event=${dto.event_id}, participant=${dto.participant_id} (id: ${id})`);
     
     try {
-      // Tạo số ngẫu nhiên từ 1000 đến 999999 nếu không được cung cấp
-      const serial_number = dto.serial_number ?? Math.floor(Math.random() * (999999 - 1000 + 1)) + 1000;
+      // Kiểm tra xem event-participant đã tồn tại chưa (unique constraint trên event_id + participant_id)
+      const existing = await this.eventParticipantsRepository.findOne({
+        where: {
+          event_id: dto.event_id,
+          participant_id: dto.participant_id,
+        },
+      });
+
+      if (existing) {
+        this.logger.warn(`Event-participant already exists: event=${dto.event_id}, participant=${dto.participant_id} (existing id: ${existing.id})`);
+        throw new BadRequestException(
+          `Participant đã được thêm vào sự kiện này rồi. Event ID: ${dto.event_id}, Participant ID: ${dto.participant_id}`
+        );
+      }
+
+      // Serial number chỉ được cấp khi check-in, không cấp khi tạo event participant
+      // Nếu DTO có serial_number (ví dụ từ import hoặc test), sử dụng nó, nếu không thì để null
+      const serial_number = dto.serial_number ?? null;
       const entity = this.eventParticipantsRepository.create({
         ...dto,
         id,
@@ -46,6 +68,19 @@ export class EventParticipantsService {
       this.logger.log(`Event-participant created successfully: ${id}`);
       return saved;
     } catch (error) {
+      // Nếu là BadRequestException (từ check duplicate), throw lại
+      if (error instanceof BadRequestException) {
+        throw error;
+      }
+      
+      // Nếu là duplicate key error từ database, throw BadRequestException với message rõ ràng hơn
+      if (error.code === '23505' || (error as any).driverError?.code === '23505') {
+        this.logger.warn(`Duplicate key error: event=${dto.event_id}, participant=${dto.participant_id}`);
+        throw new BadRequestException(
+          `Participant đã được thêm vào sự kiện này rồi. Event ID: ${dto.event_id}, Participant ID: ${dto.participant_id}`
+        );
+      }
+      
       this.logger.error(`Failed to create event-participant: ${error.message}`, error.stack, { dto });
       throw error;
     }
@@ -60,25 +95,55 @@ export class EventParticipantsService {
     return participants;
   }
 
-  async findAllWithPagination(page = 1, limit = 10, search?: string) {
-    this.logger.debug(`Finding event-participants with pagination: page=${page}, limit=${limit}, search=${search || 'none'}`);
-    
-    const where = search
-      ? [
-          { event_id: ILike(`%${search}%`) },
-          { participant_id: ILike(`%${search}%`) },
-        ]
-      : {};
+  async findAllWithPagination(
+    page = 1,
+    limit = 10,
+    search?: string,
+    event_id?: string,
+    participant_id?: string,
+    loadRelations = false,
+  ) {
+    this.logger.debug(
+      `Finding event-participants with pagination: page=${page}, limit=${limit}, search=${search || 'none'}, event_id=${event_id || 'none'}, participant_id=${participant_id || 'none'}, relations=${loadRelations}`,
+    );
+
+    // Build where condition
+    // If we have exact filters (event_id or participant_id), use them with exact match
+    // If we have search, use OR conditions for searchable fields
+    let where: any;
+
+    if (event_id || participant_id) {
+      // Use exact match for specified filters
+      where = {};
+      if (event_id) {
+        where.event_id = event_id;
+      }
+      if (participant_id) {
+        where.participant_id = participant_id;
+      }
+      // If search is also provided, it will be ignored when exact filters are present
+      // (to avoid confusion, we prioritize exact filters)
+    } else if (search) {
+      // Use OR conditions for search
+      where = [
+        { event_id: ILike(`%${search}%`) },
+        { participant_id: ILike(`%${search}%`) },
+      ];
+    } else {
+      // No filters, return all
+      where = {};
+    }
 
     const [items, total] = await this.eventParticipantsRepository.findAndCount({
       where,
+      relations: loadRelations ? ['participant', 'event'] : [],
       order: { created_at: 'DESC' },
       skip: (page - 1) * limit,
       take: limit,
     });
 
     this.logger.log(`Found ${total} event-participants (returning ${items.length} items)`);
-    
+
     return {
       data: items,
       pagination: {
@@ -105,11 +170,12 @@ export class EventParticipantsService {
     return eventParticipant;
   }
 
-  async findByEventId(eventId: string): Promise<EventParticipant[]> {
-    this.logger.debug(`Finding event-participants by event id: ${eventId}`);
+  async findByEventId(eventId: string, loadRelations = false): Promise<EventParticipant[]> {
+    this.logger.debug(`Finding event-participants by event id: ${eventId}, relations=${loadRelations}`);
     
     const eventParticipants = await this.eventParticipantsRepository.find({
       where: { event_id: eventId },
+      relations: loadRelations ? ['participant'] : [],
     });
     
     this.logger.log(`Found ${eventParticipants.length} event-participants for event ${eventId}`);
@@ -359,54 +425,121 @@ export class EventParticipantsService {
       throw new BadRequestException('Participant đã được check-in rồi');
     }
 
-    // Đếm số người đã check-in trong event để cấp serial_number
-    const checkedInCount = await this.eventParticipantsRepository.count({
-      where: {
-        event_id: eventParticipant.event_id,
-        status: ParticipantStatus.CHECKED_IN,
-      },
-    });
+    // Sử dụng transaction để đảm bảo serial number được cấp tuần tự, tránh race condition
+    const queryRunner = this.dataSource.createQueryRunner();
+    await queryRunner.connect();
+    await queryRunner.startTransaction();
 
-    const serialNumber = checkedInCount + 1;
-    const checkinTime = new Date();
+    try {
+      // Lấy MAX(serial_number) của những người đã check-in trong event này
+      // Sử dụng lock để tránh race condition khi nhiều người check-in cùng lúc
+      const maxSerialResult = await queryRunner.manager
+        .createQueryBuilder(EventParticipant, 'ep')
+        .select('COALESCE(MAX(ep.serial_number), 0)', 'maxSerial')
+        .where('ep.event_id = :eventId', { eventId: eventParticipant.event_id })
+        .andWhere('ep.status = :status', { status: ParticipantStatus.CHECKED_IN })
+        .andWhere('ep.serial_number IS NOT NULL')
+        .getRawOne();
 
-    // Cập nhật event participant
-    eventParticipant.status = ParticipantStatus.CHECKED_IN;
-    eventParticipant.checkin_time = checkinTime;
-    eventParticipant.serial_number = serialNumber;
+      const maxSerial = maxSerialResult?.maxSerial ? parseInt(maxSerialResult.maxSerial, 10) : 0;
+      const serialNumber = maxSerial + 1;
+      const checkinTime = new Date();
 
-    const updated = await this.eventParticipantsRepository.save(eventParticipant);
+      // Cập nhật event participant trong transaction
+      eventParticipant.status = ParticipantStatus.CHECKED_IN;
+      eventParticipant.checkin_time = checkinTime;
+      eventParticipant.serial_number = serialNumber;
 
-    // Kiểm tra participant có phải là receptionist không
-    const participant = await this.participantsService.findOne(eventParticipant.participant_id);
-    
-    if (participant.is_receptionist && eventParticipant.event.representative_identity) {
-      // Tìm representative của event
-      const representative = await this.participantsService.findByIdentityNumber(
-        eventParticipant.event.representative_identity
-      );
+      const updated = await queryRunner.manager.save(EventParticipant, eventParticipant);
 
-      if (representative) {
-        // Tạo thông báo
-        const notification = await this.notificationsService.create({
-          event_id: eventParticipant.event_id,
-          title: `Người đón tiếp đã đến sự kiện`,
-          message: `${participant.full_name} (${participant.identity_number}) đã check-in vào sự kiện ${eventParticipant.event.name} với số thứ tự ${serialNumber}`,
-          type: NotificationType.REMINDER,
+      await queryRunner.commitTransaction();
+      
+      this.logger.log(`Event-participant checked in successfully: ${id} with serial number ${serialNumber}`);
+      
+      // Gán lại vào eventParticipant để trả về
+      Object.assign(eventParticipant, updated);
+
+      // Lấy thông tin participant vừa check-in
+      const checkedInParticipant = await this.participantsService.findOne(eventParticipant.participant_id);
+
+      // Tìm tất cả receptionist trong event này và gửi thông báo
+      try {
+        // Lấy tất cả event participants của event này với relations
+        const allEventParticipants = await this.eventParticipantsRepository.find({
+          where: { event_id: eventParticipant.event_id },
+          relations: ['participant'],
         });
 
-        // Gửi thông báo cho representative
-        await this.notificationReceiversService.create({
-          notification_id: notification.id,
-          participant_id: representative.id,
-          sent_at: new Date(),
-        });
+        // Lọc ra những participant có is_receptionist = true
+        const receptionists = allEventParticipants.filter(
+          ep => ep.participant && (ep.participant as any).is_receptionist === true
+        );
 
-        this.logger.log(`Sent notification to representative ${representative.id} about receptionist check-in`);
+        if (receptionists.length > 0) {
+          // Tạo notification
+          const notification = await this.notificationsService.create({
+            event_id: eventParticipant.event_id,
+            title: `Thông báo về việc khách mời đã tham dự sự kiện`,
+            message: `Kính gửi Ban tổ chức,\n\nThông báo khách mời ${checkedInParticipant.full_name} (Số CMND/CCCD: ${checkedInParticipant.identity_number}) đã tham dự sự kiện "${eventParticipant.event.name}" với số thứ tự ${serialNumber}.\n\nTrân trọng.`,
+            type: NotificationType.REMINDER,
+          });
+
+          // Gửi thông báo cho tất cả receptionist
+          this.logger.log(`[CHECK_IN] Sending check-in notification to ${receptionists.length} receptionists...`);
+          let receiverSuccessCount = 0;
+          let receiverErrorCount = 0;
+          
+          for (const receptionistEp of receptionists) {
+            try {
+              // Tạo notification receiver
+              await this.notificationReceiversService.create({
+                notification_id: notification.id,
+                participant_id: receptionistEp.participant_id,
+                sent_at: new Date(),
+              });
+              receiverSuccessCount++;
+
+              // Gửi qua Socket.IO
+              try {
+                const socketIds = this.socketService.getSocketIds(receptionistEp.participant_id);
+                if (socketIds.length > 0) {
+                  socketIds.forEach(socketId => {
+                    this.socketGateway.server.to(socketId).emit('notification', {
+                      id: notification.id,
+                      event_id: notification.event_id,
+                      title: notification.title,
+                      message: notification.message,
+                      type: notification.type,
+                      created_at: notification.created_at,
+                    });
+                  });
+                  this.logger.log(`[CHECK_IN] ✅ Sent check-in notification to receptionist ${receptionistEp.participant_id} via Socket.IO (${socketIds.length} socket(s))`);
+                } else {
+                  this.logger.debug(`[CHECK_IN] Receptionist ${receptionistEp.participant_id} is not connected via Socket.IO`);
+                }
+              } catch (socketError) {
+                this.logger.warn(`[CHECK_IN] ⚠️ Failed to send check-in notification via Socket.IO to receptionist ${receptionistEp.participant_id}: ${socketError.message}`);
+              }
+            } catch (error) {
+              receiverErrorCount++;
+              this.logger.error(`[CHECK_IN] ❌ Failed to create notification receiver for receptionist ${receptionistEp.participant_id}: ${error.message}`, error.stack);
+            }
+          }
+
+          this.logger.log(`[CHECK_IN] ✅ Completed: NotificationReceiver creation: ${receiverSuccessCount} success, ${receiverErrorCount} errors. Sent check-in notification to ${receptionists.length} receptionists`);
+        }
+      } catch (error) {
+        this.logger.error(`Failed to send check-in notification to receptionists: ${error.message}`, error.stack);
+        // Không throw error để không làm gián đoạn quá trình check-in
       }
-    }
 
-    this.logger.log(`Event-participant checked in successfully: ${id} with serial number ${serialNumber}`);
-    return updated;
+      return eventParticipant;
+    } catch (error) {
+      await queryRunner.rollbackTransaction();
+      this.logger.error(`Error checking in event-participant ${id}: ${error.message}`, error.stack);
+      throw error;
+    } finally {
+      await queryRunner.release();
+    }
   }
 }

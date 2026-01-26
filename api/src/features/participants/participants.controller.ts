@@ -12,6 +12,7 @@ import {
   BadRequestException,
   Res,
   Logger,
+  NotFoundException,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -102,6 +103,15 @@ export class ParticipantsController {
     }
   }
 
+  @Get('by-identity')
+  async findByIdentityNumber(@Query('identityNumber') identityNumber: string) {
+    const participant = await this.participantsService.findByIdentityNumber(identityNumber);
+    if (!participant) {
+      throw new BadRequestException(`Participant with identity number ${identityNumber} not found`);
+    }
+    return participant;
+  }
+
   @Get(':id')
   findOne(@Param('id') id: string) {
     return this.participantsService.findOne(id);
@@ -120,7 +130,7 @@ export class ParticipantsController {
   @Post('by-identities')
   async findByIdentities(@Body('identity_numbers') identityNumbers: string[]) {
     if (!Array.isArray(identityNumbers) || identityNumbers.length === 0) {
-      throw new BadRequestException('identity_numbers must be a non-empty array');
+      throw new NotFoundException('Không tìm thấy người dùng');
     }
 
     return this.participantsService.findByIdentityNumbers(identityNumbers);

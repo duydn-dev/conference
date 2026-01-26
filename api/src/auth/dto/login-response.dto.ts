@@ -4,6 +4,7 @@ export class LoginResponseDto {
     email: string;
     fullname?: string;
     sdt: string;
+    identity_number: string;
     [key: string]: any;
   };
   token: string;

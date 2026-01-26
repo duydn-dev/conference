@@ -4,6 +4,7 @@ import { JwtService } from '@nestjs/jwt';
 import { LoginDto } from './dto/login.dto';
 import { LoginResponseDto } from './dto/login-response.dto';
 import { ParticipantsService } from '../features/participants/participants.service';
+import { OrganizerUnitsService } from '../features/organizer-units/organizer-units.service';
 import { RSAEncryptHelper } from 'src/common/encryption/rsa-encrypt-helper.service';
 import { HttpService } from '@nestjs/axios';
 import { IhanoiLoginResponse } from './dto/ihanoi.login.response';
@@ -17,6 +18,7 @@ export class AuthService {
   constructor(
     private readonly configService: ConfigService,
     private readonly participantsService: ParticipantsService,
+    private readonly organizerUnitsService: OrganizerUnitsService,
     private readonly rsaEncryptHelper: RSAEncryptHelper,
     private readonly httpService: HttpService,
     private readonly jwtService: JwtService,
@@ -62,6 +64,28 @@ export class AuthService {
         throw new Error('Không tìm thấy identification_no trong response');
       }
 
+      // Xử lý department từ iHanoi response - tạo organizer unit nếu chưa có
+      if (ihanoiData.user.department) {
+        try {
+          let organizerUnit = await this.organizerUnitsService.findByName(ihanoiData.user.department);
+          
+          if (!organizerUnit) {
+            // Tạo mới organizer unit nếu chưa có
+            this.logger.log(`Creating new organizer unit: ${ihanoiData.user.department}`);
+            organizerUnit = await this.organizerUnitsService.create({
+              id: uuidv4(),
+              name: ihanoiData.user.department,
+            });
+            this.logger.log(`Organizer unit created successfully: ${organizerUnit.id} - ${organizerUnit.name}`);
+          } else {
+            this.logger.debug(`Organizer unit already exists: ${organizerUnit.id} - ${organizerUnit.name}`);
+          }
+        } catch (error) {
+          this.logger.warn(`Failed to process organizer unit: ${error.message}`);
+          // Không throw error để không làm fail login process
+        }
+      }
+
       // Kiểm tra participant theo identification_no (identity_number trong DB)
       let participant = await this.participantsService.findByIdentityNumber(identificationNo);
 
@@ -95,6 +119,7 @@ export class AuthService {
           email: participant.email || '',
           fullname: participant.full_name,
           sdt: participant.phone || '',
+          identity_number: participant.identity_number,
         },
         token: '', // Sẽ được gán sau
       };

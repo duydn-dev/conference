@@ -17,20 +17,29 @@ export class NotificationReceiversService {
 
   async create(dto: CreateNotificationReceiverDto): Promise<NotificationReceiver> {
     const id = dto.id ?? uuidv4();
-    this.logger.log(`Creating notification receiver: notification=${dto.notification_id}, participant=${dto.participant_id} (id: ${id})`);
+    this.logger.log(`[NOTIFICATION_RECEIVER] Creating notification receiver: notification=${dto.notification_id}, participant=${dto.participant_id} (id: ${id})`);
+    this.logger.debug(`[NOTIFICATION_RECEIVER] DTO: ${JSON.stringify(dto)}`);
 
     try {
-      const entity = this.notificationReceiversRepository.create({
+      const entityData = {
         ...dto,
         id,
-        sent_at: dto.sent_at ? new Date(dto.sent_at) : null,
+        sent_at: dto.sent_at ? new Date(dto.sent_at) : (dto.sent_at === undefined ? new Date() : null),
         read_at: dto.read_at ? new Date(dto.read_at) : null,
-      } as any);
+      };
+      
+      this.logger.debug(`[NOTIFICATION_RECEIVER] Entity data: ${JSON.stringify(entityData)}`);
+      
+      const entity = this.notificationReceiversRepository.create(entityData as any);
+      this.logger.debug(`[NOTIFICATION_RECEIVER] Entity created, saving to database...`);
+      
       const saved = await this.notificationReceiversRepository.save(entity) as unknown as NotificationReceiver;
-      this.logger.log(`Notification receiver created successfully: ${id}`);
+      this.logger.log(`[NOTIFICATION_RECEIVER] ✅ Notification receiver created successfully: ${id} (notification=${saved.notification_id}, participant=${saved.participant_id})`);
       return saved;
     } catch (error) {
-      this.logger.error(`Failed to create notification receiver: ${error.message}`, error.stack, { dto });
+      this.logger.error(`[NOTIFICATION_RECEIVER] ❌ Failed to create notification receiver: ${error.message}`);
+      this.logger.error(`[NOTIFICATION_RECEIVER] Error stack: ${error.stack}`);
+      this.logger.error(`[NOTIFICATION_RECEIVER] DTO that failed: ${JSON.stringify(dto)}`);
       throw error;
     }
   }

@@ -147,6 +147,9 @@ import type { CreateMinigameDto } from '~/types/minigame'
 useHead({
   title: 'Thêm mới Mini Game'
 })
+definePageMeta({
+  middleware: ['auth']
+})
 
 const toast = useToastSafe()
 const { create } = useMinigames()

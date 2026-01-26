@@ -110,7 +110,9 @@ import { useToastSafe } from '~/composables/useToastSafe'
 useHead({
   title: 'Chỉnh sửa đơn vị tổ chức'
 })
-
+definePageMeta({
+  middleware: ['auth']
+})
 const route = useRoute()
 const toast = useToastSafe()
 const { getById, update } = useOrganizerUnits()

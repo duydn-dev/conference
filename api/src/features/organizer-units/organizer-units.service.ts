@@ -89,6 +89,22 @@ export class OrganizerUnitsService {
     return organizerUnit;
   }
 
+  async findByName(name: string): Promise<OrganizerUnit | null> {
+    this.logger.debug(`Finding organizer unit by name: ${name}`);
+    
+    const organizerUnit = await this.organizerUnitsRepository.findOne({
+      where: { name },
+    });
+    
+    if (organizerUnit) {
+      this.logger.debug(`Organizer unit found: ${organizerUnit.id} - ${organizerUnit.name}`);
+    } else {
+      this.logger.debug(`Organizer unit not found with name: ${name}`);
+    }
+    
+    return organizerUnit;
+  }
+
   async update(id: string, dto: UpdateOrganizerUnitDto): Promise<OrganizerUnit> {
     this.logger.log(`Updating organizer unit: ${id}`);
     

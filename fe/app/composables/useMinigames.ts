@@ -51,11 +51,19 @@ export const useMinigames = () => {
     })
   }
 
+  const drawPrizes = async (id: string) => {
+    return await $fetch(`/minigames/${id}/draw-prizes`, {
+      method: 'POST',
+      baseURL
+    })
+  }
+
   return {
     getPagination,
     getById,
     create,
     update,
-    remove
+    remove,
+    drawPrizes
   }
 }

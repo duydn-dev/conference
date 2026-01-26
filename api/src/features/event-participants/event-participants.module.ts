@@ -7,6 +7,7 @@ import { ParticipantsModule } from '../participants/participants.module';
 import { EventsModule } from '../events/events.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { NotificationReceiversModule } from '../notification-receivers/notification-receivers.module';
+import { SocketModule } from '../../common/socket/socket.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { NotificationReceiversModule } from '../notification-receivers/notificat
     forwardRef(() => EventsModule),
     forwardRef(() => NotificationsModule),
     forwardRef(() => NotificationReceiversModule),
+    SocketModule,
   ],
   controllers: [EventParticipantsController],
   providers: [EventParticipantsService],

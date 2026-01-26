@@ -8,5 +8,6 @@ import { OrganizerUnit } from './entities/organizer-unit.entity';
   imports: [TypeOrmModule.forFeature([OrganizerUnit])],
   controllers: [OrganizerUnitsController],
   providers: [OrganizerUnitsService],
+  exports: [OrganizerUnitsService], // Export để các module khác có thể sử dụng
 })
 export class OrganizerUnitsModule {}

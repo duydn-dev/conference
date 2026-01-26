@@ -1,5 +1,6 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { useSocket } from './useSocket'
 
 interface LoginCredentials {
   username: string
@@ -9,9 +10,12 @@ interface LoginCredentials {
 
 interface User {
   id: string
-  username: string
+  username?: string
   email: string
   name?: string
+  fullname?: string
+  identity_number?: string
+  sdt?: string
 }
 
 interface AuthResponse {
@@ -23,57 +27,201 @@ const user = ref<User | null>(null)
 const token = ref<string | null>(null)
 const loading = ref(false)
 
+
+export const getUser = () => {
+  if (process.client) {
+    // Đọc từ cookie trước, fallback về localStorage nếu không có
+    const authUserCookie = useCookie('auth_user', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    })
+    
+    if (authUserCookie.value) {
+      try {
+        return typeof authUserCookie.value === 'string' 
+          ? JSON.parse(authUserCookie.value) 
+          : authUserCookie.value
+      } catch (e) {
+        console.error('Error parsing auth_user cookie:', e)
+      }
+    }
+    
+    // Fallback về localStorage
+    const storedUser = localStorage.getItem('auth_user')
+    if (storedUser) {
+      try {
+        return JSON.parse(storedUser)
+      } catch (e) {
+        console.error('Error parsing auth_user from localStorage:', e)
+      }
+    }
+  }
+  return {}
+}
+
+export const decodeJWT = (token: any) =>  {
+  try {
+    // Kiểm tra định dạng JWT (3 phần)
+    const parts = (token ? token.value : token)?.split('.') || [];
+    if (parts.length !== 3) {
+      throw new Error('Invalid JWT format');
+    }
+    
+    // Base64 decode payload (phần thứ 2)
+    const base64Payload = parts[1];
+    
+    // Thay thế các ký tự đặc biệt của Base64Url
+    const base64 = base64Payload?.replace(/-/g, '+')
+      .replace(/_/g, '/') || '';
+    
+    // Thêm padding nếu cần
+    const padding = base64?.length % 4 || 0;
+    const paddedBase64 = padding ? 
+      base64 + '='.repeat(4 - padding) : 
+      base64;
+    
+    // Decode Base64
+    const jsonPayload = decodeURIComponent(
+      atob(paddedBase64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    
+    // Parse JSON
+    return JSON.parse(jsonPayload);
+  } catch (error) {
+    console.error('JWT decode error:', error);
+    return null;
+  }
+}
+
+export const isAuthenticated = () => {
+  const user = useCookie('auth_user');
+  return user && user.value;
+}
+
 export const useAuth = () => {
   const router = useRouter()
   const config = useRuntimeConfig()
 
-  // Load auth state from localStorage on initialization
+  // Load auth state từ cookie
   if (process.client) {
-    const storedToken = localStorage.getItem('auth_token')
-    const storedUser = localStorage.getItem('auth_user')
+    // Đọc user từ cookie (không httpOnly)
+    const authUserCookie = useCookie('auth_user', {
+      httpOnly: false,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict',
+    })
     
-    if (storedToken && storedUser) {
-      token.value = storedToken
+    if (authUserCookie.value) {
       try {
-        user.value = JSON.parse(storedUser)
+        const userData = typeof authUserCookie.value === 'string' 
+          ? JSON.parse(authUserCookie.value) 
+          : authUserCookie.value
+        user.value = userData
+        // Token được lưu trong cookie httpOnly từ server
+        // Không thể đọc trực tiếp từ client, nhưng cookie sẽ tự động gửi trong request
+        token.value = 'authenticated'
+        
+        // Connect Socket.IO nếu có token
+        const socketTokenCookie = useCookie('socket_token', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+        if (socketTokenCookie.value) {
+          console.log('[USE_AUTH] Found socket_token cookie, connecting Socket.IO...')
+          console.log('[USE_AUTH] Token length:', socketTokenCookie.value.length)
+          console.log('[USE_AUTH] Token preview:', socketTokenCookie.value.substring(0, 50) + '...')
+          const { connect } = useSocket()
+          connect(socketTokenCookie.value)
+        } else {
+          console.warn('[USE_AUTH] No socket_token cookie found, skipping Socket.IO connection')
+        }
       } catch (e) {
-        console.error('Error parsing stored user:', e)
-        localStorage.removeItem('auth_token')
-        localStorage.removeItem('auth_user')
+        console.error('Error parsing auth_user cookie:', e)
+        authUserCookie.value = null
+      }
+    } else {
+      // Fallback: Đọc từ localStorage (để migrate dữ liệu cũ)
+      const storedUser = localStorage.getItem('auth_user')
+      if (storedUser) {
+        try {
+          user.value = JSON.parse(storedUser)
+          token.value = 'authenticated'
+          // Migrate từ localStorage sang cookie
+          const authUserCookie = useCookie('auth_user', {
+            httpOnly: false,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'strict',
+          })
+          authUserCookie.value = storedUser
+        } catch (e) {
+          console.error('Error parsing stored user:', e)
+          localStorage.removeItem('auth_user')
+        }
       }
     }
   }
 
-  const isAuthenticated = computed(() => !!token.value && !!user.value)
-
   const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     loading.value = true
-    const apiBase = config.public.apiBase || 'http://localhost:3001'
+    
     try {
       const response = await $fetch<AuthResponse>(
-        `${apiBase}/auth/login`,
+        '/api/auth/login',
         {
           method: 'POST',
           body: {
             username: credentials.username,
-            password: credentials.password
+            password: credentials.password,
+            remember: credentials.remember
           }
         }
       )
 
       // Set auth state
       user.value = response.user
+      // Lưu token vào memory để dùng cho Authorization header khi cần
       token.value = response.token
 
-      // Store in localStorage
+      // Lưu token vào cookie không httpOnly để Socket.IO có thể đọc
       if (process.client) {
-        if (credentials.remember) {
-          localStorage.setItem('auth_token', response.token)
-          localStorage.setItem('auth_user', JSON.stringify(response.user))
-        } else {
-          sessionStorage.setItem('auth_token', response.token)
-          sessionStorage.setItem('auth_user', JSON.stringify(response.user))
+        const socketTokenCookie = useCookie('socket_token', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+        socketTokenCookie.value = response.token
+
+        // Connect Socket.IO
+        const { connect } = useSocket()
+        connect(response.token)
+      }
+
+      // auth_user đã được set vào cookie từ server (login.post.ts)
+      // Đồng bộ với cookie để đảm bảo có dữ liệu
+      if (process.client) {
+        const authUserCookie = useCookie('auth_user', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+        // Đọc lại từ cookie để đảm bảo đồng bộ
+        if (authUserCookie.value) {
+          try {
+            const userData = typeof authUserCookie.value === 'string' 
+              ? JSON.parse(authUserCookie.value) 
+              : authUserCookie.value
+            user.value = userData
+          } catch (e) {
+            console.error('Error parsing auth_user cookie after login:', e)
+          }
         }
+        // Giữ localStorage như backup (có thể xóa sau khi migrate xong)
+        localStorage.setItem('auth_user', JSON.stringify(response.user))
       }
 
       return response
@@ -98,13 +246,15 @@ export const useAuth = () => {
 
   const logout = async () => {
     try {
-      // Call logout API if available
-      const config = useRuntimeConfig()
-      await $fetch(`${config.public.apiBase}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token.value}`
-        }
+      // Disconnect Socket.IO
+      if (process.client) {
+        const { disconnect } = useSocket()
+        disconnect()
+      }
+
+      // Gọi API logout để xóa cookie từ server
+      await $fetch('/api/auth/logout', {
+        method: 'POST'
       }).catch(() => {
         // Ignore errors on logout
       })
@@ -115,12 +265,23 @@ export const useAuth = () => {
       user.value = null
       token.value = null
 
-      // Clear storage
+      // Clear cookie và localStorage
       if (process.client) {
-        localStorage.removeItem('auth_token')
+        const authUserCookie = useCookie('auth_user', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+        authUserCookie.value = null
+        
+        const socketTokenCookie = useCookie('socket_token', {
+          httpOnly: false,
+          secure: process.env.NODE_ENV === 'production',
+          sameSite: 'strict',
+        })
+        socketTokenCookie.value = null
+        
         localStorage.removeItem('auth_user')
-        sessionStorage.removeItem('auth_token')
-        sessionStorage.removeItem('auth_user')
       }
 
       // Redirect to login
@@ -129,7 +290,9 @@ export const useAuth = () => {
   }
 
   const getAuthHeaders = () => {
-    if (!token.value) {
+    // Token được lưu trong cookie httpOnly và trong memory
+    // Sử dụng token trong memory để gửi Authorization header khi cần
+    if (!token.value || token.value === 'authenticated') {
       return {}
     }
     return {
@@ -140,10 +303,10 @@ export const useAuth = () => {
   return {
     user: computed(() => user.value),
     token: computed(() => token.value),
-    isAuthenticated,
     loading: computed(() => loading.value),
     login,
     logout,
-    getAuthHeaders
+    getAuthHeaders,
+    getUser
   }
 }

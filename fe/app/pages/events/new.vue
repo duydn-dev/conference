@@ -236,12 +236,16 @@ import { useOrganizerUnits } from '~/composables/useOrganizerUnits'
 import { useEventDocuments } from '~/composables/useEventDocuments'
 import { useEventParticipants } from '~/composables/useEventParticipants'
 import { useToastSafe } from '~/composables/useToastSafe'
+import { getUser } from '~/composables/useAuth'
 import { EventStatus, EventStatusLabels } from '~/types/event'
 import { ParticipantStatus, ImportSource } from '~/types/event-participant'
 import type { Participant } from '~/types/participant'
 
 useHead({
   title: 'Thêm mới sự kiện'
+})
+definePageMeta({
+  middleware: ['auth']
 })
 
 const toast = useToastSafe()
@@ -449,8 +453,22 @@ const handleLocationSelected = (location: { address: string; lat: number; lng: n
   formData.value.location = `${location.lat},${location.lng}`
 }
 
-onMounted(() => {
-  loadOrganizerUnits()
+onMounted(async () => {
+  await loadOrganizerUnits()
+  // Auto-fill representative info from current user
+  const currentUser = getUser()
+  if (currentUser && currentUser.id) {
+    // Fill representative_name from user fullname
+    if (currentUser.fullname) {
+      formData.value.representative_name = currentUser.fullname
+    } else if (currentUser.name) {
+      formData.value.representative_name = currentUser.name
+    }
+    // Fill representative_identity from user identity_number
+    if (currentUser.identity_number) {
+      formData.value.representative_identity = currentUser.identity_number
+    }
+  }
 })
 </script>
 

@@ -27,6 +27,9 @@ export class MinigamePrize {
   @Column({ type: 'int' })
   quantity: number;
 
+  @Column({ type: 'int', default: 0 })
+  order: number;
+
   @Column({ type: 'text', nullable: true })
   description?: string | null;
 

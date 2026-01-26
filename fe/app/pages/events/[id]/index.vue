@@ -58,11 +58,11 @@
                 :rounded="true"
                 class="shadow-md"
               />
-              <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/90 text-xs font-medium text-gray-800">
-                <i class="pi pi-hashtag mr-1" /> {{ event.code }}
+              <span class="inline-flex items-center px-3 py-1 rounded-full bg-white/90 text-xs font-medium text-red-800" v-tooltip.top="'Số thứ tự của bạn'" type="text">
+                <i class="pi pi-address-book mr-1" /> <span class="ms-1 text-lg">{{ currentEventParticipant ? currentEventParticipant.serial_number : 'Chưa được đánh dấu' }}</span>
               </span>
             </div>
-            <div class="absolute top-4 right-4">
+            <div v-if="isEventRepresentative" class="absolute top-4 right-4">
               <Button 
                 label="Chỉnh sửa sự kiện" 
                 icon="pi pi-pencil" 
@@ -216,6 +216,10 @@
               height="100%"
               :marker="mapMarker"
               :initial-location="initialMapLocation"
+              :target-location="targetLocation"
+              :enable-distance-check="shouldEnableDistanceCheck"
+              :distance-threshold="100"
+              @within-range="handleWithinRange"
             />
           </div>
         </div>
@@ -242,25 +246,24 @@
           <!-- Action buttons -->
           <div v-if="shouldShowButtons" class="pt-3 mt-2 border-t border-gray-100 space-y-2">
             <!-- Hiển thị 2 nút khi chưa xác nhận -->
-            <template v-if="!isConfirmed">
-              <Button 
-                label="Từ chối tham dự" 
-                icon="pi pi-times" 
-                class="w-full p-button-outlined p-button-sm border-red-300 hover:bg-red-50"
-                style="color: #dc2626;"
-                @click="handleRejectAttendance"
-              />
-              <Button 
-                label="Xác nhận tham dự" 
-                icon="pi pi-check" 
-                class="w-full p-button-outlined p-button-sm text-green-600 border-green-200"
-                @click="handleConfirmAttendance"
-              />
-            </template>
-            
-            <!-- Hiển thị nút "Đã tới" khi đã xác nhận nhưng chưa tới -->
             <Button 
-              v-else-if="isConfirmed && !hasCheckedIn"
+              label="Từ chối tham dự" 
+              icon="pi pi-times" 
+              class="w-full p-button-outlined p-button-sm border-red-300 hover:bg-red-50"
+              style="color: #dc2626;"
+              @click="handleRejectAttendance"
+            />
+            <Button 
+              label="Xác nhận tham dự" 
+              icon="pi pi-check" 
+              class="w-full p-button-outlined p-button-sm text-green-600 border-green-200"
+              @click="handleConfirmAttendance"
+            />
+          </div>
+          
+          <!-- Hiển thị nút "Đã tới" khi đã xác nhận nhưng chưa tới -->
+          <div v-else-if="isConfirmed && !hasCheckedIn" class="pt-3 mt-2 border-t border-gray-100">
+            <Button 
               label="Đã tới" 
               icon="pi pi-check-circle" 
               class="w-full p-button-outlined p-button-sm border-green-200"
@@ -269,8 +272,136 @@
             />
           </div>
         </div>
+
+        <!-- Minigame Info -->
+        <div v-if="minigame" class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+          <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+            <div class="flex items-center gap-2">
+              <i class="pi pi-game text-purple-600"></i>
+              <h3 class="font-semibold text-gray-800 text-sm">Mini Game</h3>
+            </div>
+            <Tag 
+              :value="getMinigameStatusLabel(minigame.status)" 
+              :severity="getMinigameStatusSeverity(minigame.status)"
+              :rounded="true"
+            />
+          </div>
+          <div class="p-4 space-y-3">
+            <div>
+              <h4 class="font-medium text-gray-800 mb-1">{{ minigame.name }}</h4>
+              <p v-if="minigame.description" class="text-sm text-gray-600">{{ minigame.description }}</p>
+            </div>
+            
+            <div class="text-xs text-gray-500 space-y-1">
+              <div v-if="minigame.start_time" class="flex items-center gap-1">
+                <i class="pi pi-calendar"></i>
+                <span>Bắt đầu: {{ formatDateTime(minigame.start_time) }}</span>
+              </div>
+              <div v-if="minigame.end_time" class="flex items-center gap-1">
+                <i class="pi pi-calendar"></i>
+                <span>Kết thúc: {{ formatDateTime(minigame.end_time) }}</span>
+              </div>
+              <div class="flex items-center gap-1">
+                <i class="pi pi-tag"></i>
+                <span>Loại: {{ minigame.type }}</span>
+              </div>
+            </div>
+            
+            <!-- Hiển thị nút bắt đầu nếu chưa bắt đầu -->
+            <Button 
+              v-if="canStartMinigame"
+              label="Bắt đầu minigame" 
+              icon="pi pi-play" 
+              class="w-full p-button-sm"
+              @click="handleStartMinigame"
+            />
+          </div>
+        </div>
+
+        <!-- Minigame Results (hiển thị khi đã kết thúc) -->
+        <!-- Removed from here - moved to full width section below -->
       </div>
     </div>
+
+    <!-- Minigame Results Full Width Section -->
+    <div v-if="event && minigame && minigame.status === MinigameStatus.FINISHED && minigameResults.length > 0" class="mt-6">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden">
+        <div class="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+          <i class="pi pi-trophy text-yellow-500"></i>
+          <h3 class="font-semibold text-gray-800 text-lg">Kết quả Mini Game</h3>
+        </div>
+        <div class="p-4 space-y-4">
+          <div
+            v-for="(result, index) in minigameResults"
+            :key="result.prize.id"
+            class="prize-result border border-gray-200 rounded-lg p-4 bg-gray-50"
+          >
+            <div class="flex items-start gap-4">
+              <div class="prize-icon flex-shrink-0">
+                <div class="w-12 h-12 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-md">
+                  <i class="pi pi-trophy text-2xl text-white"></i>
+                </div>
+              </div>
+              <div class="flex-1">
+                <div class="flex items-center gap-2 mb-2">
+                  <h4 class="text-base font-bold text-gray-800">{{ result.prize.prize_name }}</h4>
+                  <Tag :value="`Thứ tự: ${result.prize.order || 0}`" severity="info" :rounded="true" />
+                </div>
+                <p v-if="result.prize.description" class="text-sm text-gray-600 mb-3">
+                  {{ result.prize.description }}
+                </p>
+                
+                <div v-if="result.winners.length > 0" class="winners-list">
+                  <p class="text-sm font-medium text-gray-700 mb-2">
+                    Người thắng giải ({{ result.winners.length }}/{{ result.prize.quantity }}):
+                  </p>
+                  <div class="space-y-2">
+                    <div
+                      v-for="(winner, winnerIndex) in result.winners"
+                      :key="winner.participant_id"
+                      class="winner-item bg-white rounded-lg p-2 border border-gray-200"
+                    >
+                      <div class="flex items-center gap-3">
+                        <div class="winner-avatar flex-shrink-0">
+                          <div class="w-8 h-8 bg-blue-500 rounded-full flex items-center justify-center text-white font-semibold text-sm">
+                            {{ winner.participant?.full_name?.charAt(0)?.toUpperCase() || '?' }}
+                          </div>
+                        </div>
+                        <div class="flex-1">
+                          <p class="font-medium text-gray-800 text-sm">
+                            {{ winner.participant?.full_name || 'Không xác định' }}
+                          </p>
+                          <div class="flex flex-col gap-1 mt-1">
+                            <p v-if="winner.participant?.identity_number" class="text-xs text-gray-500">
+                              {{ winner.participant.identity_number }}
+                            </p>
+                            <p v-if="winner.serial_number" class="text-sm text-gray-500">
+                              Số thứ tự: <span class="text-red-600 text-lg font-semibold">{{ winner.serial_number }}</span>
+                            </p>
+                          </div>
+                        </div>
+                        <div class="winner-number">
+                          <Tag :value="`#${winnerIndex + 1}`" severity="success" :rounded="true" />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-center py-2 text-gray-500 text-sm">
+                  <p>Không có người thắng giải</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Minigame Draw Modal -->
+    <MinigameDrawModal
+      v-model="showDrawModal"
+      :minigame="minigame"
+    />
 
     <!-- Reject Attendance Dialog -->
     <Dialog 
@@ -316,28 +447,39 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useEvents } from '~/composables/useEvents'
 import { useEventDocuments } from '~/composables/useEventDocuments'
 import { useEventParticipants } from '~/composables/useEventParticipants'
+import { useMinigames } from '~/composables/useMinigames'
+import { useMinigameResults } from '~/composables/useMinigameResults'
+import { useParticipants } from '~/composables/useParticipants'
 import { useToastSafe } from '~/composables/useToastSafe'
 import { useRoute } from 'vue-router'
 import { EventStatus, EventStatusLabels } from '~/types/event'
 import type { EventDocument } from '~/types/event-document'
 import { ParticipantStatus } from '~/types/event-participant'
+import { MinigameStatus, MinigameStatusLabels } from '~/types/minigame'
 import { formatDateTime } from '~/utils/helpers'
 import { useFileUrl } from '~/composables/useFileUrl'
+import { getUser } from '~/composables/useAuth'
 import VMap from '~/components/VMap.vue'
+import MinigameDrawModal from '~/components/MinigameDrawModal.vue'
 
 useHead({
   title: 'Chi tiết sự kiện'
 })
-
+definePageMeta({
+  middleware: ['auth']
+})
 const route = useRoute()
 const toast = useToastSafe()
 const { getById } = useEvents()
 const { getPagination: getDocuments } = useEventDocuments()
 const { getPagination: getEventParticipants, update: updateEventParticipant, create: createEventParticipant, checkIn } = useEventParticipants()
+const { getPagination: getMinigames, update: updateMinigame } = useMinigames()
+const { getByMinigameId: getMinigameResults } = useMinigameResults()
+const { getByIdentityNumber } = useParticipants()
 const { getFullUrl } = useFileUrl()
 
 const event = ref<any | null>(null)
@@ -357,6 +499,31 @@ const isConfirmed = ref(false)
 const rejectDialogVisible = ref(false)
 const rejectReason = ref('')
 
+// Minigame state
+const minigame = ref<any | null>(null)
+const minigameLoading = ref(false)
+const minigameResults = ref<Array<{ prize: any; winners: any[] }>>([])
+const minigameResultsLoading = ref(false)
+
+// Event creator participant (for comparison)
+const eventCreatorParticipant = ref<any | null>(null)
+
+// Get current user
+const currentUser = computed(() => {
+  if (process.client) {
+    return getUser()
+  }
+  return null
+})
+
+// Check if current user is the representative of the event
+const isEventRepresentative = computed(() => {
+  if (!currentUser.value?.identity_number || !event.value?.representative_identity) {
+    return false
+  }
+  return currentUser.value.identity_number === event.value.representative_identity
+})
+
 const loadEvent = async () => {
   try {
     loading.value = true
@@ -365,6 +532,8 @@ const loadEvent = async () => {
     
     if (data) {
       event.value = data as any
+      // Load participant của người tạo event sau khi load event
+      await loadEventCreatorParticipant()
     }
   } catch (error) {
     console.error('Error loading event:', error)
@@ -420,6 +589,68 @@ const initialMapLocation = computed(() => {
   return null
 })
 
+// Target location để kiểm tra khoảng cách (địa điểm sự kiện)
+const targetLocation = computed<{ lat: number; lng: number } | null>(() => {
+  if (!event.value?.location) return null
+  const parts = String(event.value.location).split(',').map((p: string) => parseFloat(p.trim()))
+  if (parts.length !== 2 || parts.some(isNaN)) return null
+  // stored as "lat,lng"
+  const lat = parts[0]
+  const lng = parts[1]
+  if (typeof lat !== 'number' || typeof lng !== 'number' || isNaN(lat) || isNaN(lng)) return null
+  return {
+    lat,
+    lng
+  }
+})
+
+// Chỉ bật kiểm tra khoảng cách nếu:
+// - Có target location
+// - User đã xác nhận tham dự (status = REGISTERED)
+// - Chưa check-in (status != CHECKED_IN)
+const shouldEnableDistanceCheck = computed(() => {
+  if (!targetLocation.value || !currentEventParticipant.value) return false
+  const status = currentEventParticipant.value.status
+  return status === ParticipantStatus.REGISTERED
+})
+
+// Xử lý khi user trong phạm vi 100m
+const handleWithinRange = async (data: { currentLocation: { lat: number; lng: number }; targetLocation: { lat: number; lng: number }; distance: number }) => {
+  if (!currentEventParticipant.value) {
+    console.warn('No current event participant found')
+    return
+  }
+
+  // Kiểm tra lại status để đảm bảo chưa check-in
+  if (currentEventParticipant.value.status === ParticipantStatus.CHECKED_IN) {
+    console.log('Already checked in')
+    return
+  }
+
+  try {
+    // Gọi API check-in
+    await checkIn(currentEventParticipant.value.id)
+    
+    // Reload participant data
+    await loadCurrentParticipant()
+    
+    toast.add({
+      severity: 'success',
+      summary: 'Thành công',
+      detail: `Bạn đã đến địa điểm sự kiện! Khoảng cách: ${Math.round(data.distance)}m`,
+      life: 5000
+    })
+  } catch (error: any) {
+    console.error('Error checking in:', error)
+    toast.add({
+      severity: 'error',
+      summary: 'Lỗi',
+      detail: error.data?.message || 'Không thể cập nhật trạng thái tham dự',
+      life: 3000
+    })
+  }
+}
+
 const getStatusSeverity = (status: EventStatus | number) => {
   const map: Record<number, string> = {
     [EventStatus.DRAFT]: 'secondary',
@@ -446,43 +677,185 @@ const hasCheckedIn = computed(() => {
 })
 
 const shouldShowButtons = computed(() => {
-  // Không hiển thị nút nếu đã từ chối hoặc đã check-in
-  if (hasRejected.value || hasCheckedIn.value) return false
-  // Hiển thị nút nếu có participant (đã đăng ký)
-  return !!currentEventParticipant.value
+  // Chỉ hiển thị nút nếu có participant (user có trong danh sách khách mời)
+  if (!currentEventParticipant.value) return false
+  
+  const status = currentEventParticipant.value.status
+  
+  // Nếu đã từ chối hoặc đã check-in thì không hiển thị
+  if (status === ParticipantStatus.ABSENT || status === ParticipantStatus.CHECKED_IN) {
+    return false
+  }
+  
+  // Hiển thị 2 nút nếu chưa xác nhận (status chưa phải REGISTERED)
+  // REGISTERED = 0 là trạng thái mặc định khi đăng ký, nhưng chưa xác nhận tham dự
+  // Nếu status là null hoặc undefined hoặc REGISTERED nhưng chưa confirm thì hiển thị
+  return status === ParticipantStatus.REGISTERED && !isConfirmed.value
 })
+
+const canStartMinigame = computed(() => {
+  // Chỉ cho phép bắt đầu minigame nếu:
+  // 1. Có minigame
+  // 2. Minigame chưa bắt đầu (status = PENDING)
+  // 3. Current user là người tạo event (so sánh identity_number)
+  if (!minigame.value || minigame.value.status !== MinigameStatus.PENDING) {
+    return false
+  }
+  
+  const currentUser = getUser()
+  if (!currentUser || !currentUser.identity_number) {
+    return false
+  }
+  
+  // So sánh identity_number của current user với representative_identity của event
+  if (!event.value?.representative_identity) {
+    return false
+  }
+  
+  // Nếu có eventCreatorParticipant, so sánh với current user
+  if (eventCreatorParticipant.value) {
+    return eventCreatorParticipant.value.identity_number === currentUser.identity_number
+  }
+  
+  // Fallback: so sánh trực tiếp representative_identity với current user identity_number
+  return event.value.representative_identity === currentUser.identity_number
+})
+
+const getMinigameStatusLabel = (status: MinigameStatus) => {
+  return MinigameStatusLabels[status] || 'Không xác định'
+}
+
+const getMinigameStatusSeverity = (status: MinigameStatus) => {
+  const map: Record<number, string> = {
+    [MinigameStatus.PENDING]: 'warning',
+    [MinigameStatus.RUNNING]: 'success',
+    [MinigameStatus.FINISHED]: 'info'
+  }
+  return map[status] || 'secondary'
+}
 
 const loadCurrentParticipant = async () => {
   try {
     participantLoading.value = true
     const eventId = route.params.id as string
-    // TODO: Replace with actual current user participant_id
-    // For now, we'll try to find the first participant or handle based on actual implementation
+    const currentUser = getUser()
+    
+    if (!currentUser || !currentUser.id) {
+      currentEventParticipant.value = null
+      isConfirmed.value = false
+      return
+    }
+    
+    // Lấy participant của current user
     const result = await getEventParticipants({ 
-      event_id: eventId, 
+      event_id: eventId,
+      participant_id: currentUser.id,
       limit: 1,
       relations: true
     } as any)
+    
     if ((result as any)?.data && (result as any).data.length > 0) {
       const participant = (result as any).data[0]
       currentEventParticipant.value = participant
       
-      // Nếu participant đã có status REGISTERED, coi như đã confirm rồi
-      // Hiển thị nút "Đã tới" thay vì 2 nút ban đầu
-      // Trường hợp mới vào trang lần đầu: sẽ có participant với status REGISTERED
-      // nhưng theo logic, sẽ hiển thị 2 nút để user có thể xác nhận lại
-      // Chỉ sau khi nhấn "Xác nhận" trong session này mới hiển thị nút "Đã tới"
-      isConfirmed.value = false
+      // Kiểm tra trạng thái: nếu đã REGISTERED thì coi như đã confirm
+      isConfirmed.value = participant.status === ParticipantStatus.REGISTERED || participant.status === ParticipantStatus.CHECKED_IN
     } else {
       currentEventParticipant.value = null
       isConfirmed.value = false
     }
   } catch (error) {
     console.error('Error loading current participant:', error)
+    currentEventParticipant.value = null
+    isConfirmed.value = false
   } finally {
     participantLoading.value = false
   }
 }
+
+const loadMinigame = async () => {
+  try {
+    minigameLoading.value = true
+    const eventId = route.params.id as string
+    
+    const result = await getMinigames({
+      event_id: eventId,
+      limit: 1,
+      relations: true
+    } as any)
+    
+    if ((result as any)?.data && (result as any).data.length > 0) {
+      minigame.value = (result as any).data[0]
+      
+      // Nếu minigame đã kết thúc, load kết quả
+      if (minigame.value.status === MinigameStatus.FINISHED) {
+        await loadMinigameResults()
+      }
+    } else {
+      minigame.value = null
+    }
+  } catch (error) {
+    console.error('Error loading minigame:', error)
+    minigame.value = null
+  } finally {
+    minigameLoading.value = false
+  }
+}
+
+const loadMinigameResults = async () => {
+  if (!minigame.value?.id) return
+  
+  try {
+    minigameResultsLoading.value = true
+    const results = await getMinigameResults(minigame.value.id) as Array<{ prize: any; winners: any[] }>
+    minigameResults.value = results || []
+  } catch (error) {
+    console.error('Error loading minigame results:', error)
+    minigameResults.value = []
+  } finally {
+    minigameResultsLoading.value = false
+  }
+}
+
+const loadEventCreatorParticipant = async () => {
+  try {
+    if (!event.value?.representative_identity) {
+      eventCreatorParticipant.value = null
+      return
+    }
+    
+    // Load participant từ representative_identity (CCCD)
+    const participant = await getByIdentityNumber(event.value.representative_identity)
+    eventCreatorParticipant.value = participant as any
+  } catch (error: any) {
+    // Nếu không tìm thấy (404), không phải lỗi nghiêm trọng
+    if (error.status === 404 || error.statusCode === 404) {
+      console.log('Event creator participant not found, this is normal if participant was not created yet')
+      eventCreatorParticipant.value = null
+    } else {
+      console.error('Error loading event creator participant:', error)
+      eventCreatorParticipant.value = null
+    }
+  }
+}
+
+// Minigame draw modal state
+const showDrawModal = ref(false)
+
+const handleStartMinigame = async () => {
+  if (!minigame.value) return
+  
+  // Mở modal để quay giải
+  showDrawModal.value = true
+}
+
+// Watch modal để reload minigame sau khi đóng
+watch(showDrawModal, async (newVal) => {
+  if (!newVal && minigame.value) {
+    // Reload minigame để cập nhật status
+    await loadMinigame()
+  }
+})
 
 const handleRejectAttendance = async () => {
   rejectReason.value = ''
@@ -621,6 +994,6 @@ const handleMarkAttended = async () => {
 }
 
 onMounted(async () => {
-  await Promise.all([loadEvent(), loadDocuments(), loadCurrentParticipant()])
+  await Promise.all([loadEvent(), loadDocuments(), loadCurrentParticipant(), loadMinigame()])
 })
 </script>

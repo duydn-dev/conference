@@ -308,6 +308,9 @@ import type { EventDocument } from '~/types/event-document'
 useHead({
   title: 'Chỉnh sửa sự kiện'
 })
+definePageMeta({
+  middleware: ['auth']
+})
 
 const route = useRoute()
 const toast = useToastSafe()
@@ -510,7 +513,18 @@ const loadParticipants = async () => {
         await Promise.all(fetchPromises)
       }
 
-      selectedParticipants.value = eventParticipants.map((ep: any) => {
+      // Loại bỏ duplicate dựa trên participant_id - chỉ giữ lại bản ghi đầu tiên
+      const seenParticipantIds = new Set<string>()
+      const uniqueEventParticipants: any[] = []
+      
+      for (const ep of eventParticipants) {
+        if (ep.participant_id && !seenParticipantIds.has(ep.participant_id)) {
+          seenParticipantIds.add(ep.participant_id)
+          uniqueEventParticipants.push(ep)
+        }
+      }
+
+      selectedParticipants.value = uniqueEventParticipants.map((ep: any) => {
         const p = participantsMap[ep.participant_id] || ep.participant || {}
         return {
           id: ep.participant_id,

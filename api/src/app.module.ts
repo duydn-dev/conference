@@ -20,6 +20,7 @@ import { DashboardModule } from './features/dashboard/dashboard.module';
 import { AuthModule } from './auth/auth.module';
 import { LoggerModule } from './common/logger/logger.module';
 import { EncryptionModule } from './common/encryption/encryption.module';
+import { SocketModule } from './common/socket/socket.module';
 import { HttpModule } from '@nestjs/axios';
 
 @Module({
@@ -33,17 +34,25 @@ import { HttpModule } from '@nestjs/axios';
     }),
     // Database-first TypeORM setup (entities array sẽ bổ sung sau)
     TypeOrmModule.forRootAsync({
-      useFactory: () => ({
-        type: 'postgres',
-        host: process.env.DB_HOST || 'localhost',
-        port: parseInt(process.env.DB_PORT || '5432', 10),
-        username: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || 'postgres',
-        database: process.env.DB_NAME || 'conference',
-        synchronize: process.env.NODE_ENV === 'development', // Auto create tables in dev
-        logging: process.env.NODE_ENV === 'development',
-        autoLoadEntities: true,
-      }),
+      useFactory: () => {
+        console.log('Configuring database connection...');
+        return {
+          type: 'postgres',
+          host: process.env.DB_HOST || 'localhost',
+          port: parseInt(process.env.DB_PORT || '5432', 10),
+          username: process.env.DB_USER || 'postgres',
+          password: process.env.DB_PASSWORD || 'postgres',
+          database: process.env.DB_NAME || 'conference',
+          synchronize: process.env.NODE_ENV === 'development', // Auto create tables in dev
+          logging: process.env.NODE_ENV === 'development',
+          autoLoadEntities: true,
+          connectTimeoutMS: 5000, // 5 seconds timeout
+          extra: {
+            max: 10, // Maximum number of connections
+            connectionTimeoutMillis: 5000,
+          },
+        };
+      },
     }),
     HttpModule,
     EventsModule,
@@ -62,6 +71,7 @@ import { HttpModule } from '@nestjs/axios';
     EventJobsModule,
     DashboardModule,
     EncryptionModule,
+    SocketModule,
   ],
   controllers: [AppController],
   providers: [AppService],

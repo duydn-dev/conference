@@ -25,6 +25,12 @@ interface Props {
     lat: number
     lng: number
   } | null
+  targetLocation?: {
+    lat: number
+    lng: number
+  } | null
+  distanceThreshold?: number // Khoảng cách tối thiểu (mét) để emit event, mặc định 100m
+  enableDistanceCheck?: boolean // Bật/tắt kiểm tra khoảng cách
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -35,7 +41,10 @@ const props = withDefaults(defineProps<Props>(), {
   width: '100%',
   height: '400px',
   mapId: 'vtmap',
-  initialLocation: null
+  initialLocation: null,
+  targetLocation: null,
+  distanceThreshold: 100,
+  enableDistanceCheck: false
 })
 
 const map = ref<any>(null)
@@ -43,12 +52,68 @@ const map = ref<any>(null)
 const mapId = ref(props.mapId || `vtmap-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`)
 const mapLoaded = ref(false)
 
+// State để theo dõi vị trí hiện tại và kiểm tra khoảng cách
+const currentLocation = ref<{ lat: number; lng: number } | null>(null)
+const distanceCheckInterval = ref<NodeJS.Timeout | null>(null)
+const hasEmittedWithinRange = ref(false) // Để tránh emit nhiều lần
+
+// Kiểm tra khoảng cách và emit event nếu trong phạm vi
+const checkDistance = () => {
+  if (!props.enableDistanceCheck || !props.targetLocation || !currentLocation.value) {
+    return
+  }
+
+  const distance = getDistanceInMeters(
+    currentLocation.value.lat,
+    currentLocation.value.lng,
+    props.targetLocation.lat,
+    props.targetLocation.lng
+  )
+
+  if (distance <= props.distanceThreshold && !hasEmittedWithinRange.value) {
+    hasEmittedWithinRange.value = true
+    emit('within-range', {
+      currentLocation: currentLocation.value,
+      targetLocation: props.targetLocation,
+      distance
+    })
+  } else if (distance > props.distanceThreshold) {
+    // Reset flag nếu ra khỏi phạm vi (để có thể emit lại khi vào lại)
+    hasEmittedWithinRange.value = false
+  }
+}
+
+// Bắt đầu theo dõi khoảng cách
+const startDistanceTracking = () => {
+  if (!props.enableDistanceCheck || !props.targetLocation) {
+    return
+  }
+
+  // Kiểm tra mỗi 5 giây
+  if (distanceCheckInterval.value) {
+    clearInterval(distanceCheckInterval.value)
+  }
+
+  distanceCheckInterval.value = setInterval(() => {
+    checkDistance()
+  }, 5000) // Check every 5 seconds
+}
+
+// Dừng theo dõi khoảng cách
+const stopDistanceTracking = () => {
+  if (distanceCheckInterval.value) {
+    clearInterval(distanceCheckInterval.value)
+    distanceCheckInterval.value = null
+  }
+}
+
 const emit = defineEmits<{
   'map-created': [map: any]
   'map-loaded': [map: any]
   'map-error': [error: any]
   'map-selected': [location: { address: string; lat: number; lng: number }]
   'location-found': [location: { lat: number; lng: number }]
+  'within-range': [data: { currentLocation: { lat: number; lng: number }; targetLocation: { lat: number; lng: number }; distance: number }]
 }>()
 
 const loadScript = (): Promise<void> => {
@@ -112,6 +177,24 @@ const loadScript = (): Promise<void> => {
   })
 }
 
+// Tính khoảng cách giữa hai điểm trên bề mặt Trái Đất (đơn vị: mét)
+const getDistanceInMeters = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
+  const R = 6371000 // bán kính Trái Đất (m)
+  const toRad = (deg: number) => deg * Math.PI / 180
+
+  const dLat = toRad(lat2 - lat1)
+  const dLng = toRad(lng2 - lng1)
+
+  const a =
+    Math.sin(dLat / 2) ** 2 +
+    Math.cos(toRad(lat1)) *
+      Math.cos(toRad(lat2)) *
+      Math.sin(dLng / 2) ** 2
+
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a))
+  return R * c
+}
+
 // Xác định style cho map
 const getMapStyle = () => {
   if (props.style === 'vtmapgl.STYLES.VSATELLITE') {
@@ -157,7 +240,9 @@ const addGeolocateControl = () => {
     if (e?.coords) {
       const lat = e.coords.latitude
       const lng = e.coords.longitude
+      currentLocation.value = { lat, lng }
       emit('location-found', { lat, lng })
+      checkDistance() // Kiểm tra ngay khi có location
     } else if (map.value) {
       // Nếu không có trong event, lấy từ map center (map đã tự động di chuyển đến vị trí)
       setTimeout(() => {
@@ -165,7 +250,10 @@ const addGeolocateControl = () => {
         if (center) {
           const lat = center.lat
           const lng = center.lng
+          currentLocation.value = { lat, lng }
+          console.log('location-found', { lat, lng })
           emit('location-found', { lat, lng })
+          checkDistance() // Kiểm tra ngay khi có location
         }
       }, 100)
     }
@@ -196,7 +284,9 @@ const addGeolocateControl = () => {
     if (e?.lngLat) {
       const lat = e.lngLat.lat
       const lng = e.lngLat.lng
+      currentLocation.value = { lat, lng }
       emit('location-found', { lat, lng })
+      checkDistance() // Kiểm tra ngay khi có location
     } else if (map.value) {
       // Fallback: lấy từ map center sau khi geolocate
       setTimeout(() => {
@@ -204,7 +294,9 @@ const addGeolocateControl = () => {
         if (center) {
           const lat = center.lat
           const lng = center.lng
+          currentLocation.value = { lat, lng }
           emit('location-found', { lat, lng })
+          checkDistance() // Kiểm tra ngay khi có location
         }
       }, 100)
     }
@@ -218,6 +310,19 @@ const addGeolocateControl = () => {
   
   map.value.addControl(geolocateControl)
   geolocateControlRef.value = geolocateControl
+
+  // Lắng nghe sự thay đổi vị trí user (khi user di chuyển)
+  geolocateControl.on('trackuserlocationstart', () => {
+    // Bắt đầu theo dõi khoảng cách khi bắt đầu track user location
+    if (props.enableDistanceCheck) {
+      startDistanceTracking()
+    }
+  })
+
+  geolocateControl.on('trackuserlocationend', () => {
+    // Dừng theo dõi khi không track nữa
+    stopDistanceTracking()
+  })
 }
 
 // Thêm control tìm kiếm địa điểm
@@ -426,6 +531,24 @@ watch(() => props.initialLocation, (loc) => {
   applyInitialLocation()
 }, { deep: true })
 
+// Watch for targetLocation changes
+watch(() => props.targetLocation, (newTarget) => {
+  if (newTarget && props.enableDistanceCheck && currentLocation.value) {
+    // Reset flag khi target location thay đổi
+    hasEmittedWithinRange.value = false
+    checkDistance()
+  }
+}, { deep: true })
+
+// Watch for enableDistanceCheck changes
+watch(() => props.enableDistanceCheck, (enabled) => {
+  if (enabled && props.targetLocation) {
+    startDistanceTracking()
+  } else {
+    stopDistanceTracking()
+  }
+})
+
 // Watch for zoom changes
 watch(() => props.zoom, (newZoom) => {
   if (map.value && newZoom) {
@@ -449,6 +572,7 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  stopDistanceTracking()
   if (map.value) {
     map.value.remove()
     map.value = null
@@ -473,7 +597,9 @@ defineExpose({
     createLocationMarker(lng, lat, address)
     map.value.setCenter([lng, lat])
     emit('map-selected', { address, lat, lng })
-  }
+  },
+  // Expose hàm tính khoảng cách để parent component có thể sử dụng
+  getDistanceInMeters
 })
 </script>
 

@@ -28,6 +28,10 @@ export const useMinigameResults = () => {
     return await $fetch(`/minigame-results/${id}`, { baseURL, query })
   }
 
+  const getByMinigameId = async (minigameId: string) => {
+    return await $fetch(`/minigame-results/by-minigame/${minigameId}`, { baseURL })
+  }
+
   const create = async (data: CreateMinigameResultDto) => {
     return await useFetch('/minigame-results', {
       method: 'POST',
@@ -46,6 +50,7 @@ export const useMinigameResults = () => {
   return {
     getPagination,
     getById,
+    getByMinigameId,
     create,
     remove
   }

@@ -46,4 +46,9 @@ export class MinigamesController {
   remove(@Param('id') id: string) {
     return this.minigamesService.remove(id);
   }
+
+  @Post(':id/draw-prizes')
+  drawPrizes(@Param('id') id: string) {
+    return this.minigamesService.drawPrizes(id);
+  }
 }

@@ -5,6 +5,7 @@ import { HttpModule } from '@nestjs/axios';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { ParticipantsModule } from '../features/participants';
+import { OrganizerUnitsModule } from '../features/organizer-units/organizer-units.module';
 import { EncryptionModule } from '../common/encryption/encryption.module';
 
 @Module({
@@ -12,6 +13,7 @@ import { EncryptionModule } from '../common/encryption/encryption.module';
     ConfigModule,
     HttpModule,
     ParticipantsModule,
+    OrganizerUnitsModule, // Import để sử dụng OrganizerUnitsService
     EncryptionModule,
     JwtModule.registerAsync({
       imports: [ConfigModule],
@@ -29,6 +31,6 @@ import { EncryptionModule } from '../common/encryption/encryption.module';
   ],
   controllers: [AuthController],
   providers: [AuthService],
-  exports: [AuthService],
+  exports: [AuthService, JwtModule], // Export JwtModule để các module khác có thể sử dụng
 })
 export class AuthModule {}
