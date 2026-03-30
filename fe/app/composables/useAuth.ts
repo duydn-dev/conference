@@ -1,6 +1,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useSocket } from './useSocket'
+import { loginAdapter, notifyLoginSuccess } from '../../sdk-sample/login-adapter'
 
 interface LoginCredentials {
   username: string
@@ -168,19 +169,27 @@ export const useAuth = () => {
 
   const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     loading.value = true
-    
     try {
-      const response = await $fetch<AuthResponse>(
-        '/api/auth/login',
-        {
-          method: 'POST',
-          body: {
-            username: credentials.username,
-            password: credentials.password,
-            remember: credentials.remember
+      // Use loginAdapter so behavior adapts to web vs miniapp automatically
+      const webLogin = async (): Promise<AuthResponse> => {
+        return await $fetch<AuthResponse>(
+          '/api/auth/login',
+          {
+            method: 'POST',
+            body: {
+              username: credentials.username,
+              password: credentials.password,
+              remember: credentials.remember
+            }
           }
-        }
-      )
+        )
+      }
+
+      const response = await loginAdapter(webLogin)
+
+      if (!response) {
+        throw new Error('Đăng nhập thất bại')
+      }
 
       // Set auth state
       user.value = response.user
@@ -222,6 +231,13 @@ export const useAuth = () => {
         }
         // Giữ localStorage như backup (có thể xóa sau khi migrate xong)
         localStorage.setItem('auth_user', JSON.stringify(response.user))
+
+        // Notify native SDK that login succeeded (safe no-op if not present)
+        try {
+          await notifyLoginSuccess({ token: response.token }, response.user)
+        } catch (e) {
+          console.warn('notifyLoginSuccess failed:', e)
+        }
       }
 
       return response
